@@ -26,6 +26,9 @@
  *          Jerome Glisse
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
 /* this file defines the CHIP_  and family flags used in the pciids,
  * its is common between kms and non-kms because duplicating it and
  * changing one place is fail.

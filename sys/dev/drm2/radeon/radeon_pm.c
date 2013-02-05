@@ -20,13 +20,14 @@
  * Authors: Rafał Miłecki <zajec5@gmail.com>
  *          Alex Deucher <alexdeucher@gmail.com>
  */
-#include <drm/drmP.h>
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
 #include "radeon.h"
 #include "avivod.h"
 #include "atom.h"
-#include <linux/power_supply.h>
-#include <linux/hwmon.h>
-#include <linux/hwmon-sysfs.h>
 
 #define RADEON_IDLE_LOOP_MS 100
 #define RADEON_RECLOCK_DELAY_MS 200
@@ -40,7 +41,9 @@ static const char *radeon_pm_state_type_name[5] = {
 	"Performance",
 };
 
+#ifdef DUMBBELL_WIP
 static void radeon_dynpm_idle_work_handler(struct work_struct *work);
+#endif /* DUMBBELL_WIP */
 static int radeon_debugfs_pm_init(struct radeon_device *rdev);
 static bool radeon_pm_in_vbl(struct radeon_device *rdev);
 static bool radeon_pm_debug_check_in_vbl(struct radeon_device *rdev, bool finish);
@@ -69,10 +72,10 @@ void radeon_pm_acpi_event_handler(struct radeon_device *rdev)
 {
 	if (rdev->pm.pm_method == PM_METHOD_PROFILE) {
 		if (rdev->pm.profile == PM_PROFILE_AUTO) {
-			mutex_lock(&rdev->pm.mutex);
+			sx_xlock(&rdev->pm.mutex);
 			radeon_pm_update_profile(rdev);
 			radeon_pm_set_clocks(rdev);
-			mutex_unlock(&rdev->pm.mutex);
+			sx_xunlock(&rdev->pm.mutex);
 		}
 	}
 }
@@ -84,6 +87,7 @@ static void radeon_pm_update_profile(struct radeon_device *rdev)
 		rdev->pm.profile_index = PM_PROFILE_DEFAULT_IDX;
 		break;
 	case PM_PROFILE_AUTO:
+#ifdef DUMBBELL_WIP
 		if (power_supply_is_system_supplied() > 0) {
 			if (rdev->pm.active_crtc_count > 1)
 				rdev->pm.profile_index = PM_PROFILE_HIGH_MH_IDX;
@@ -95,6 +99,7 @@ static void radeon_pm_update_profile(struct radeon_device *rdev)
 			else
 				rdev->pm.profile_index = PM_PROFILE_MID_SH_IDX;
 		}
+#endif /* DUMBBELL_WIP */
 		break;
 	case PM_PROFILE_LOW:
 		if (rdev->pm.active_crtc_count > 1)
@@ -146,9 +151,11 @@ static void radeon_sync_with_vblank(struct radeon_device *rdev)
 {
 	if (rdev->pm.active_crtcs) {
 		rdev->pm.vblank_sync = false;
+#ifdef DUMBBELL_WIP
 		wait_event_timeout(
 			rdev->irq.vblank_queue, rdev->pm.vblank_sync,
 			msecs_to_jiffies(RADEON_WAIT_VBLANK_TIMEOUT));
+#endif /* DUMBBELL_WIP */
 	}
 }
 
@@ -241,9 +248,9 @@ static void radeon_pm_set_clocks(struct radeon_device *rdev)
 	    (rdev->pm.requested_power_state_index == rdev->pm.current_power_state_index))
 		return;
 
-	mutex_lock(&rdev->ddev->struct_mutex);
-	down_write(&rdev->pm.mclk_lock);
-	mutex_lock(&rdev->ring_lock);
+	sx_xlock(&rdev->ddev->dev_struct_lock);
+	rw_wlock(&rdev->pm.mclk_lock);
+	sx_xlock(&rdev->ring_lock);
 
 	/* wait for the rings to drain */
 	for (i = 0; i < RADEON_NUM_RINGS; i++) {
@@ -254,9 +261,9 @@ static void radeon_pm_set_clocks(struct radeon_device *rdev)
 		r = radeon_fence_wait_empty_locked(rdev, i);
 		if (r) {
 			/* needs a GPU reset dont reset here */
-			mutex_unlock(&rdev->ring_lock);
-			up_write(&rdev->pm.mclk_lock);
-			mutex_unlock(&rdev->ddev->struct_mutex);
+			sx_xunlock(&rdev->ring_lock);
+			rw_wunlock(&rdev->pm.mclk_lock);
+			sx_xunlock(&rdev->ddev->dev_struct_lock);
 			return;
 		}
 	}
@@ -290,9 +297,9 @@ static void radeon_pm_set_clocks(struct radeon_device *rdev)
 
 	rdev->pm.dynpm_planned_action = DYNPM_ACTION_NONE;
 
-	mutex_unlock(&rdev->ring_lock);
-	up_write(&rdev->pm.mclk_lock);
-	mutex_unlock(&rdev->ddev->struct_mutex);
+	sx_xunlock(&rdev->ring_lock);
+	rw_wunlock(&rdev->pm.mclk_lock);
+	sx_xunlock(&rdev->ddev->dev_struct_lock);
 }
 
 static void radeon_pm_print_states(struct radeon_device *rdev)
@@ -329,6 +336,7 @@ static void radeon_pm_print_states(struct radeon_device *rdev)
 	}
 }
 
+#ifdef DUMBBELL_WIP
 static ssize_t radeon_get_pm_profile(struct device *dev,
 				     struct device_attribute *attr,
 				     char *buf)
@@ -352,7 +360,7 @@ static ssize_t radeon_set_pm_profile(struct device *dev,
 	struct drm_device *ddev = pci_get_drvdata(to_pci_dev(dev));
 	struct radeon_device *rdev = ddev->dev_private;
 
-	mutex_lock(&rdev->pm.mutex);
+	sx_xlock(&rdev->pm.mutex);
 	if (rdev->pm.pm_method == PM_METHOD_PROFILE) {
 		if (strncmp("default", buf, strlen("default")) == 0)
 			rdev->pm.profile = PM_PROFILE_DEFAULT;
@@ -374,7 +382,7 @@ static ssize_t radeon_set_pm_profile(struct device *dev,
 		count = -EINVAL;
 
 fail:
-	mutex_unlock(&rdev->pm.mutex);
+	sx_xunlock(&rdev->pm.mutex);
 
 	return count;
 }
@@ -401,19 +409,21 @@ static ssize_t radeon_set_pm_method(struct device *dev,
 
 
 	if (strncmp("dynpm", buf, strlen("dynpm")) == 0) {
-		mutex_lock(&rdev->pm.mutex);
+		sx_xlock(&rdev->pm.mutex);
 		rdev->pm.pm_method = PM_METHOD_DYNPM;
 		rdev->pm.dynpm_state = DYNPM_STATE_PAUSED;
 		rdev->pm.dynpm_planned_action = DYNPM_ACTION_DEFAULT;
-		mutex_unlock(&rdev->pm.mutex);
+		sx_xunlock(&rdev->pm.mutex);
 	} else if (strncmp("profile", buf, strlen("profile")) == 0) {
-		mutex_lock(&rdev->pm.mutex);
+		sx_xlock(&rdev->pm.mutex);
 		/* disable dynpm */
 		rdev->pm.dynpm_state = DYNPM_STATE_DISABLED;
 		rdev->pm.dynpm_planned_action = DYNPM_ACTION_NONE;
 		rdev->pm.pm_method = PM_METHOD_PROFILE;
-		mutex_unlock(&rdev->pm.mutex);
+		sx_xunlock(&rdev->pm.mutex);
+#ifdef DUMBBELL_WIP
 		cancel_delayed_work_sync(&rdev->pm.dynpm_idle_work);
+#endif /* DUMBBELL_WIP */
 	} else {
 		count = -EINVAL;
 		goto fail;
@@ -478,12 +488,15 @@ static struct attribute *hwmon_attributes[] = {
 static const struct attribute_group hwmon_attrgroup = {
 	.attrs = hwmon_attributes,
 };
+#endif /* DUMBBELL_WIP */
 
 static int radeon_hwmon_init(struct radeon_device *rdev)
 {
 	int err = 0;
 
+#ifdef DUMBBELL_WIP
 	rdev->pm.int_hwmon_dev = NULL;
+#endif /* DUMBBELL_WIP */
 
 	switch (rdev->pm.int_thermal_type) {
 	case THERMAL_TYPE_RV6XX:
@@ -495,6 +508,7 @@ static int radeon_hwmon_init(struct radeon_device *rdev)
 		/* No support for TN yet */
 		if (rdev->family == CHIP_ARUBA)
 			return err;
+#ifdef DUMBBELL_WIP
 		rdev->pm.int_hwmon_dev = hwmon_device_register(rdev->dev);
 		if (IS_ERR(rdev->pm.int_hwmon_dev)) {
 			err = PTR_ERR(rdev->pm.int_hwmon_dev);
@@ -510,6 +524,7 @@ static int radeon_hwmon_init(struct radeon_device *rdev)
 				"Unable to create hwmon sysfs file: %d\n", err);
 			hwmon_device_unregister(rdev->dev);
 		}
+#endif /* DUMBBELL_WIP */
 		break;
 	default:
 		break;
@@ -520,22 +535,26 @@ static int radeon_hwmon_init(struct radeon_device *rdev)
 
 static void radeon_hwmon_fini(struct radeon_device *rdev)
 {
+#ifdef DUMBBELL_WIP
 	if (rdev->pm.int_hwmon_dev) {
 		sysfs_remove_group(&rdev->pm.int_hwmon_dev->kobj, &hwmon_attrgroup);
 		hwmon_device_unregister(rdev->pm.int_hwmon_dev);
 	}
+#endif /* DUMBBELL_WIP */
 }
 
 void radeon_pm_suspend(struct radeon_device *rdev)
 {
-	mutex_lock(&rdev->pm.mutex);
+	sx_xlock(&rdev->pm.mutex);
 	if (rdev->pm.pm_method == PM_METHOD_DYNPM) {
 		if (rdev->pm.dynpm_state == DYNPM_STATE_ACTIVE)
 			rdev->pm.dynpm_state = DYNPM_STATE_SUSPENDED;
 	}
-	mutex_unlock(&rdev->pm.mutex);
+	sx_xunlock(&rdev->pm.mutex);
 
+#ifdef DUMBBELL_WIP
 	cancel_delayed_work_sync(&rdev->pm.dynpm_idle_work);
+#endif /* DUMBBELL_WIP */
 }
 
 void radeon_pm_resume(struct radeon_device *rdev)
@@ -556,7 +575,7 @@ void radeon_pm_resume(struct radeon_device *rdev)
 			radeon_set_memory_clock(rdev, rdev->pm.default_mclk);
 	}
 	/* asic init will reset the default power state */
-	mutex_lock(&rdev->pm.mutex);
+	sx_xlock(&rdev->pm.mutex);
 	rdev->pm.current_power_state_index = rdev->pm.default_power_state_index;
 	rdev->pm.current_clock_mode_index = 0;
 	rdev->pm.current_sclk = rdev->pm.default_sclk;
@@ -566,10 +585,12 @@ void radeon_pm_resume(struct radeon_device *rdev)
 	if (rdev->pm.pm_method == PM_METHOD_DYNPM
 	    && rdev->pm.dynpm_state == DYNPM_STATE_SUSPENDED) {
 		rdev->pm.dynpm_state = DYNPM_STATE_ACTIVE;
+#ifdef DUMBBELL_WIP
 		schedule_delayed_work(&rdev->pm.dynpm_idle_work,
 				      msecs_to_jiffies(RADEON_IDLE_LOOP_MS));
+#endif /* DUMBBELL_WIP */
 	}
-	mutex_unlock(&rdev->pm.mutex);
+	sx_xunlock(&rdev->pm.mutex);
 	radeon_pm_compute_clocks(rdev);
 }
 
@@ -619,14 +640,20 @@ int radeon_pm_init(struct radeon_device *rdev)
 	if (ret)
 		return ret;
 
+#ifdef DUMBBELL_WIP
 	INIT_DELAYED_WORK(&rdev->pm.dynpm_idle_work, radeon_dynpm_idle_work_handler);
+#endif /* DUMBBELL_WIP */
 
 	if (rdev->pm.num_power_states > 1) {
 		/* where's the best place to put these? */
+#ifdef DUMBBELL_WIP
 		ret = device_create_file(rdev->dev, &dev_attr_power_profile);
+#endif /* DUMBBELL_WIP */
 		if (ret)
 			DRM_ERROR("failed to create device file for power profile\n");
+#ifdef DUMBBELL_WIP
 		ret = device_create_file(rdev->dev, &dev_attr_power_method);
+#endif /* DUMBBELL_WIP */
 		if (ret)
 			DRM_ERROR("failed to create device file for power method\n");
 
@@ -643,7 +670,7 @@ int radeon_pm_init(struct radeon_device *rdev)
 void radeon_pm_fini(struct radeon_device *rdev)
 {
 	if (rdev->pm.num_power_states > 1) {
-		mutex_lock(&rdev->pm.mutex);
+		sx_xlock(&rdev->pm.mutex);
 		if (rdev->pm.pm_method == PM_METHOD_PROFILE) {
 			rdev->pm.profile = PM_PROFILE_DEFAULT;
 			radeon_pm_update_profile(rdev);
@@ -654,16 +681,18 @@ void radeon_pm_fini(struct radeon_device *rdev)
 			rdev->pm.dynpm_planned_action = DYNPM_ACTION_DEFAULT;
 			radeon_pm_set_clocks(rdev);
 		}
-		mutex_unlock(&rdev->pm.mutex);
+		sx_xunlock(&rdev->pm.mutex);
 
+#ifdef DUMBBELL_WIP
 		cancel_delayed_work_sync(&rdev->pm.dynpm_idle_work);
 
 		device_remove_file(rdev->dev, &dev_attr_power_profile);
 		device_remove_file(rdev->dev, &dev_attr_power_method);
+#endif /* DUMBBELL_WIP */
 	}
 
 	if (rdev->pm.power_state)
-		kfree(rdev->pm.power_state);
+		free(rdev->pm.power_state, DRM_MEM_DRIVER);
 
 	radeon_hwmon_fini(rdev);
 }
@@ -677,7 +706,7 @@ void radeon_pm_compute_clocks(struct radeon_device *rdev)
 	if (rdev->pm.num_power_states < 2)
 		return;
 
-	mutex_lock(&rdev->pm.mutex);
+	sx_xlock(&rdev->pm.mutex);
 
 	rdev->pm.active_crtcs = 0;
 	rdev->pm.active_crtc_count = 0;
@@ -697,7 +726,9 @@ void radeon_pm_compute_clocks(struct radeon_device *rdev)
 		if (rdev->pm.dynpm_state != DYNPM_STATE_DISABLED) {
 			if (rdev->pm.active_crtc_count > 1) {
 				if (rdev->pm.dynpm_state == DYNPM_STATE_ACTIVE) {
+#ifdef DUMBBELL_WIP
 					cancel_delayed_work(&rdev->pm.dynpm_idle_work);
+#endif /* DUMBBELL_WIP */
 
 					rdev->pm.dynpm_state = DYNPM_STATE_PAUSED;
 					rdev->pm.dynpm_planned_action = DYNPM_ACTION_DEFAULT;
@@ -715,17 +746,23 @@ void radeon_pm_compute_clocks(struct radeon_device *rdev)
 					radeon_pm_get_dynpm_state(rdev);
 					radeon_pm_set_clocks(rdev);
 
+#ifdef DUMBBELL_WIP
 					schedule_delayed_work(&rdev->pm.dynpm_idle_work,
 							      msecs_to_jiffies(RADEON_IDLE_LOOP_MS));
+#endif /* DUMBBELL_WIP */
 				} else if (rdev->pm.dynpm_state == DYNPM_STATE_PAUSED) {
 					rdev->pm.dynpm_state = DYNPM_STATE_ACTIVE;
+#ifdef DUMBBELL_WIP
 					schedule_delayed_work(&rdev->pm.dynpm_idle_work,
 							      msecs_to_jiffies(RADEON_IDLE_LOOP_MS));
+#endif /* DUMBBELL_WIP */
 					DRM_DEBUG_DRIVER("radeon: dynamic power management activated\n");
 				}
 			} else { /* count == 0 */
 				if (rdev->pm.dynpm_state != DYNPM_STATE_MINIMUM) {
+#ifdef DUMBBELL_WIP
 					cancel_delayed_work(&rdev->pm.dynpm_idle_work);
+#endif /* DUMBBELL_WIP */
 
 					rdev->pm.dynpm_state = DYNPM_STATE_MINIMUM;
 					rdev->pm.dynpm_planned_action = DYNPM_ACTION_MINIMUM;
@@ -736,7 +773,7 @@ void radeon_pm_compute_clocks(struct radeon_device *rdev)
 		}
 	}
 
-	mutex_unlock(&rdev->pm.mutex);
+	sx_xunlock(&rdev->pm.mutex);
 }
 
 static bool radeon_pm_in_vbl(struct radeon_device *rdev)
@@ -770,6 +807,7 @@ static bool radeon_pm_debug_check_in_vbl(struct radeon_device *rdev, bool finish
 	return in_vbl;
 }
 
+#ifdef DUMBBELL_WIP
 static void radeon_dynpm_idle_work_handler(struct work_struct *work)
 {
 	struct radeon_device *rdev;
@@ -778,7 +816,7 @@ static void radeon_dynpm_idle_work_handler(struct work_struct *work)
 				pm.dynpm_idle_work.work);
 
 	resched = ttm_bo_lock_delayed_workqueue(&rdev->mman.bdev);
-	mutex_lock(&rdev->pm.mutex);
+	sx_xlock(&rdev->pm.mutex);
 	if (rdev->pm.dynpm_state == DYNPM_STATE_ACTIVE) {
 		int not_processed = 0;
 		int i;
@@ -827,9 +865,10 @@ static void radeon_dynpm_idle_work_handler(struct work_struct *work)
 		schedule_delayed_work(&rdev->pm.dynpm_idle_work,
 				      msecs_to_jiffies(RADEON_IDLE_LOOP_MS));
 	}
-	mutex_unlock(&rdev->pm.mutex);
+	sx_xunlock(&rdev->pm.mutex);
 	ttm_bo_unlock_delayed_workqueue(&rdev->mman.bdev, resched);
 }
+#endif /* DUMBBELL_WIP */
 
 /*
  * Debugfs info

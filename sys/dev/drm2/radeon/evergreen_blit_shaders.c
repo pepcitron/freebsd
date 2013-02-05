@@ -24,9 +24,10 @@
  *     Alex Deucher <alexander.deucher@amd.com>
  */
 
-#include <linux/bug.h>
-#include <linux/types.h>
-#include <linux/kernel.h>
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
 
 /*
  * evergreen cards need to use the 3D engine to blit data which requires
@@ -352,6 +353,6 @@ const u32 evergreen_ps[] =
 	0x00000000,
 };
 
-const u32 evergreen_ps_size = ARRAY_SIZE(evergreen_ps);
-const u32 evergreen_vs_size = ARRAY_SIZE(evergreen_vs);
-const u32 evergreen_default_size = ARRAY_SIZE(evergreen_default_state);
+const u32 evergreen_ps_size = DRM_ARRAY_SIZE(evergreen_ps);
+const u32 evergreen_vs_size = DRM_ARRAY_SIZE(evergreen_vs);
+const u32 evergreen_default_size = DRM_ARRAY_SIZE(evergreen_default_state);

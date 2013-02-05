@@ -30,10 +30,13 @@
  *    Keith Whitwell <keith@tungstengraphics.com>
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
 #ifndef __RADEON_DRM_H__
 #define __RADEON_DRM_H__
 
-#include <drm/drm.h>
+#include <dev/drm2/drm.h>
 
 /* WARNING: If you change any of these defines, make sure to change the
  * defines in the X server file (radeon_sarea.h)
@@ -757,7 +760,7 @@ typedef struct drm_radeon_irq_wait {
 
 typedef struct drm_radeon_setparam {
 	unsigned int param;
-	__s64 value;
+	int64_t value;
 } drm_radeon_setparam_t;
 
 #define RADEON_SETPARAM_FB_LOCATION    1	/* determined framebuffer location */

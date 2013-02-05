@@ -25,6 +25,10 @@
  *          Alex Deucher
  *          Jerome Glisse
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
 #ifndef __RADEON_ASIC_H__
 #define __RADEON_ASIC_H__
 
@@ -71,7 +75,7 @@ void r100_pci_gart_tlb_flush(struct radeon_device *rdev);
 int r100_pci_gart_set_page(struct radeon_device *rdev, int i, uint64_t addr);
 void r100_ring_start(struct radeon_device *rdev, struct radeon_ring *ring);
 int r100_irq_set(struct radeon_device *rdev);
-int r100_irq_process(struct radeon_device *rdev);
+irqreturn_t r100_irq_process(struct radeon_device *rdev);
 void r100_fence_ring_emit(struct radeon_device *rdev,
 			  struct radeon_fence *fence);
 void r100_semaphore_ring_emit(struct radeon_device *rdev,
@@ -219,7 +223,7 @@ extern void rs600_fini(struct radeon_device *rdev);
 extern int rs600_suspend(struct radeon_device *rdev);
 extern int rs600_resume(struct radeon_device *rdev);
 int rs600_irq_set(struct radeon_device *rdev);
-int rs600_irq_process(struct radeon_device *rdev);
+irqreturn_t rs600_irq_process(struct radeon_device *rdev);
 void rs600_irq_disable(struct radeon_device *rdev);
 u32 rs600_get_vblank_counter(struct radeon_device *rdev, int crtc);
 void rs600_gart_tlb_flush(struct radeon_device *rdev);
@@ -363,7 +367,7 @@ int r600_blit_init(struct radeon_device *rdev);
 void r600_blit_fini(struct radeon_device *rdev);
 int r600_init_microcode(struct radeon_device *rdev);
 /* r600 irq */
-int r600_irq_process(struct radeon_device *rdev);
+irqreturn_t r600_irq_process(struct radeon_device *rdev);
 int r600_irq_init(struct radeon_device *rdev);
 void r600_irq_fini(struct radeon_device *rdev);
 void r600_ih_ring_init(struct radeon_device *rdev, unsigned ring_size);
@@ -433,7 +437,7 @@ void evergreen_hpd_set_polarity(struct radeon_device *rdev,
 				enum radeon_hpd_id hpd);
 u32 evergreen_get_vblank_counter(struct radeon_device *rdev, int crtc);
 int evergreen_irq_set(struct radeon_device *rdev);
-int evergreen_irq_process(struct radeon_device *rdev);
+irqreturn_t evergreen_irq_process(struct radeon_device *rdev);
 extern int evergreen_cs_parse(struct radeon_cs_parser *p);
 extern int evergreen_dma_cs_parse(struct radeon_cs_parser *p);
 extern void evergreen_pm_misc(struct radeon_device *rdev);
@@ -456,6 +460,13 @@ int evergreen_copy_dma(struct radeon_device *rdev,
 		       uint64_t src_offset, uint64_t dst_offset,
 		       unsigned num_gpu_pages,
 		       struct radeon_fence **fence);
+void evergreen_fix_pci_max_read_req_size(struct radeon_device *rdev);
+u32 evergreen_get_number_of_dram_channels(struct radeon_device *rdev);
+void evergreen_mc_stop(struct radeon_device *rdev, struct evergreen_mc_save *save);
+void evergreen_mc_resume(struct radeon_device *rdev, struct evergreen_mc_save *save);
+void evergreen_mc_program(struct radeon_device *rdev);
+int evergreen_mc_init(struct radeon_device *rdev);
+void evergreen_irq_suspend(struct radeon_device *rdev);
 
 /*
  * cayman
@@ -500,7 +511,7 @@ bool si_gpu_is_lockup(struct radeon_device *rdev, struct radeon_ring *cp);
 int si_asic_reset(struct radeon_device *rdev);
 void si_ring_ib_execute(struct radeon_device *rdev, struct radeon_ib *ib);
 int si_irq_set(struct radeon_device *rdev);
-int si_irq_process(struct radeon_device *rdev);
+irqreturn_t si_irq_process(struct radeon_device *rdev);
 int si_vm_init(struct radeon_device *rdev);
 void si_vm_fini(struct radeon_device *rdev);
 void si_vm_set_page(struct radeon_device *rdev, uint64_t pe,

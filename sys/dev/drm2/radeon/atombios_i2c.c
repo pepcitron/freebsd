@@ -22,8 +22,12 @@
  * Authors: Alex Deucher
  *
  */
-#include <drm/drmP.h>
-#include <drm/radeon_drm.h>
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 #include "radeon.h"
 #include "atom.h"
 

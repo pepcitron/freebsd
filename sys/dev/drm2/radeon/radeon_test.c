@@ -21,8 +21,12 @@
  *
  * Authors: Michel Dänzer
  */
-#include <drm/drmP.h>
-#include <drm/radeon_drm.h>
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 #include "radeon_reg.h"
 #include "radeon.h"
 
@@ -33,6 +37,7 @@
 /* Test BO GTT->VRAM and VRAM->GTT GPU copies across the whole GTT aperture */
 static void radeon_do_test_moves(struct radeon_device *rdev, int flag)
 {
+#ifdef DUMBBELL_WIP
 	struct radeon_bo *vram_obj = NULL;
 	struct radeon_bo **gtt_obj = NULL;
 	struct radeon_fence *fence = NULL;
@@ -66,7 +71,7 @@ static void radeon_do_test_moves(struct radeon_device *rdev, int flag)
 		n -= rdev->ih.ring_size;
 	n /= size;
 
-	gtt_obj = kzalloc(n * sizeof(*gtt_obj), GFP_KERNEL);
+	gtt_obj = malloc(n * sizeof(*gtt_obj), DRM_MEM_DRIVER, M_ZERO | M_WAITOK);
 	if (!gtt_obj) {
 		DRM_ERROR("Failed to allocate %d pointers\n", n);
 		r = 1;
@@ -234,14 +239,15 @@ out_cleanup:
 				radeon_bo_unref(&gtt_obj[i]);
 			}
 		}
-		kfree(gtt_obj);
+		free(gtt_obj, DRM_MEM_DRIVER);
 	}
 	if (fence) {
 		radeon_fence_unref(&fence);
 	}
 	if (r) {
-		printk(KERN_WARNING "Error while testing BO move.\n");
+		DRM_ERROR("Error while testing BO move.\n");
 	}
+#endif /* DUMBBELL_WIP */
 }
 
 void radeon_test_moves(struct radeon_device *rdev)
@@ -287,7 +293,7 @@ void radeon_test_ring_sync(struct radeon_device *rdev,
 	}
 	radeon_ring_unlock_commit(rdev, ringA);
 
-	mdelay(1000);
+	DRM_MDELAY(1000);
 
 	if (radeon_fence_signaled(fence1)) {
 		DRM_ERROR("Fence 1 signaled without waiting for semaphore.\n");
@@ -308,7 +314,7 @@ void radeon_test_ring_sync(struct radeon_device *rdev,
 		goto out_cleanup;
 	}
 
-	mdelay(1000);
+	DRM_MDELAY(1000);
 
 	if (radeon_fence_signaled(fence2)) {
 		DRM_ERROR("Fence 2 signaled without waiting for semaphore.\n");
@@ -339,7 +345,7 @@ out_cleanup:
 		radeon_fence_unref(&fence2);
 
 	if (r)
-		printk(KERN_WARNING "Error while testing ring sync (%d).\n", r);
+		DRM_ERROR("Error while testing ring sync (%d).\n", r);
 }
 
 static void radeon_test_ring_sync2(struct radeon_device *rdev,
@@ -386,7 +392,7 @@ static void radeon_test_ring_sync2(struct radeon_device *rdev,
 	}
 	radeon_ring_unlock_commit(rdev, ringB);
 
-	mdelay(1000);
+	DRM_MDELAY(1000);
 
 	if (radeon_fence_signaled(fenceA)) {
 		DRM_ERROR("Fence A signaled without waiting for semaphore.\n");
@@ -406,7 +412,7 @@ static void radeon_test_ring_sync2(struct radeon_device *rdev,
 	radeon_ring_unlock_commit(rdev, ringC);
 
 	for (i = 0; i < 30; ++i) {
-		mdelay(100);
+		DRM_MDELAY(100);
 		sigA = radeon_fence_signaled(fenceA);
 		sigB = radeon_fence_signaled(fenceB);
 		if (sigA || sigB)
@@ -431,7 +437,7 @@ static void radeon_test_ring_sync2(struct radeon_device *rdev,
 	radeon_semaphore_emit_signal(rdev, ringC->idx, semaphore);
 	radeon_ring_unlock_commit(rdev, ringC);
 
-	mdelay(1000);
+	DRM_MDELAY(1000);
 
 	r = radeon_fence_wait(fenceA, false);
 	if (r) {
@@ -454,7 +460,7 @@ out_cleanup:
 		radeon_fence_unref(&fenceB);
 
 	if (r)
-		printk(KERN_WARNING "Error while testing ring sync (%d).\n", r);
+		DRM_ERROR("Error while testing ring sync (%d).\n", r);
 }
 
 void radeon_test_syncing(struct radeon_device *rdev)

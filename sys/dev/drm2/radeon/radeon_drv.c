@@ -29,13 +29,16 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <drm/drmP.h>
-#include <drm/radeon_drm.h>
-#include "radeon_drv.h"
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
-#include <drm/drm_pciids.h>
-#include <linux/console.h>
-#include <linux/module.h>
+#include <dev/drm2/drmP.h>
+#include <dev/drm2/radeon/radeon_drm.h>
+#include "radeon_drv.h"
+#include "radeon_gem.h"
+#include "radeon_kms.h"
+
+#include <dev/drm2/drm_pciids.h>
 
 
 /*
@@ -73,41 +76,21 @@
 #define KMS_DRIVER_MAJOR	2
 #define KMS_DRIVER_MINOR	28
 #define KMS_DRIVER_PATCHLEVEL	0
-int radeon_driver_load_kms(struct drm_device *dev, unsigned long flags);
-int radeon_driver_unload_kms(struct drm_device *dev);
-int radeon_driver_firstopen_kms(struct drm_device *dev);
-void radeon_driver_lastclose_kms(struct drm_device *dev);
-int radeon_driver_open_kms(struct drm_device *dev, struct drm_file *file_priv);
-void radeon_driver_postclose_kms(struct drm_device *dev,
-				 struct drm_file *file_priv);
-void radeon_driver_preclose_kms(struct drm_device *dev,
-				struct drm_file *file_priv);
+#ifdef DUMBBELL_WIP
 int radeon_suspend_kms(struct drm_device *dev, pm_message_t state);
+#endif /* DUMBBELL_WIP */
 int radeon_resume_kms(struct drm_device *dev);
-u32 radeon_get_vblank_counter_kms(struct drm_device *dev, int crtc);
-int radeon_enable_vblank_kms(struct drm_device *dev, int crtc);
-void radeon_disable_vblank_kms(struct drm_device *dev, int crtc);
-int radeon_get_vblank_timestamp_kms(struct drm_device *dev, int crtc,
-				    int *max_error,
-				    struct timeval *vblank_time,
-				    unsigned flags);
 void radeon_driver_irq_preinstall_kms(struct drm_device *dev);
 int radeon_driver_irq_postinstall_kms(struct drm_device *dev);
 void radeon_driver_irq_uninstall_kms(struct drm_device *dev);
 irqreturn_t radeon_driver_irq_handler_kms(DRM_IRQ_ARGS);
-int radeon_dma_ioctl_kms(struct drm_device *dev, void *data,
-			 struct drm_file *file_priv);
-int radeon_gem_object_init(struct drm_gem_object *obj);
-void radeon_gem_object_free(struct drm_gem_object *obj);
-int radeon_gem_object_open(struct drm_gem_object *obj,
-				struct drm_file *file_priv);
-void radeon_gem_object_close(struct drm_gem_object *obj,
-				struct drm_file *file_priv);
 extern int radeon_get_crtc_scanoutpos(struct drm_device *dev, int crtc,
 				      int *vpos, int *hpos);
 extern struct drm_ioctl_desc radeon_ioctls_kms[];
 extern int radeon_max_kms_ioctl;
+#ifdef DUMBBELL_WIP
 int radeon_mmap(struct file *filp, struct vm_area_struct *vma);
+#endif /* DUMBBELL_WIP */
 int radeon_mode_dumb_mmap(struct drm_file *filp,
 			  struct drm_device *dev,
 			  uint32_t handle, uint64_t *offset_p);
@@ -130,7 +113,7 @@ void radeon_debugfs_cleanup(struct drm_minor *minor);
 
 
 int radeon_no_wb;
-int radeon_modeset = -1;
+int radeon_modeset = 1;
 int radeon_dynclks = -1;
 int radeon_r4xx_atom = 0;
 int radeon_agpmode = 0;
@@ -147,6 +130,7 @@ int radeon_pcie_gen2 = -1;
 int radeon_msi = -1;
 int radeon_lockup_timeout = 10000;
 
+#ifdef DUMBBELL_WIP
 MODULE_PARM_DESC(no_wb, "Disable AGP writeback for scratch registers");
 module_param_named(no_wb, radeon_no_wb, int, 0444);
 
@@ -225,15 +209,13 @@ static int radeon_resume(struct drm_device *dev)
 	RADEON_WRITE(RADEON_GEN_INT_CNTL, dev_priv->irq_enable_reg);
 	return 0;
 }
+#endif /* DUMBBELL_WIP */
 
-static struct pci_device_id pciidlist[] = {
+static drm_pci_id_list_t pciidlist[] = {
 	radeon_PCI_IDS
 };
 
-#if defined(CONFIG_DRM_RADEON_KMS)
-MODULE_DEVICE_TABLE(pci, pciidlist);
-#endif
-
+#ifdef DUMBBELL_WIP
 static const struct file_operations radeon_driver_old_fops = {
 	.owner = THIS_MODULE,
 	.open = drm_open,
@@ -282,9 +264,11 @@ static struct drm_driver driver_old = {
 	.minor = DRIVER_MINOR,
 	.patchlevel = DRIVER_PATCHLEVEL,
 };
+#endif /* DUMBBELL_WIP */
 
-static struct drm_driver kms_driver;
+static struct drm_driver_info kms_driver;
 
+#ifdef DUMBBELL_WIP
 static int radeon_kick_out_firmware_fb(struct pci_dev *pdev)
 {
 	struct apertures_struct *ap;
@@ -354,31 +338,34 @@ static const struct file_operations radeon_driver_kms_fops = {
 	.compat_ioctl = radeon_kms_compat_ioctl,
 #endif
 };
+#endif /* DUMBBELL_WIP */
 
-static struct drm_driver kms_driver = {
+static struct drm_driver_info kms_driver = {
 	.driver_features =
 	    DRIVER_USE_AGP | DRIVER_USE_MTRR | DRIVER_PCI_DMA | DRIVER_SG |
 	    DRIVER_HAVE_IRQ | DRIVER_HAVE_DMA | DRIVER_IRQ_SHARED | DRIVER_GEM |
-	    DRIVER_PRIME,
+	    DRIVER_PRIME /* | DRIVE_MODESET */,
+#ifdef DUMBBELL_WIP
 	.dev_priv_size = 0,
+#endif /* DUMBBELL_WIP */
 	.load = radeon_driver_load_kms,
+#ifdef DUMBBELL_WIP
 	.firstopen = radeon_driver_firstopen_kms,
 	.open = radeon_driver_open_kms,
 	.preclose = radeon_driver_preclose_kms,
 	.postclose = radeon_driver_postclose_kms,
 	.lastclose = radeon_driver_lastclose_kms,
+#endif /* DUMBBELL_WIP */
 	.unload = radeon_driver_unload_kms,
+#ifdef DUMBBELL_WIP
 	.suspend = radeon_suspend_kms,
 	.resume = radeon_resume_kms,
+#endif /* DUMBBELL_WIP */
 	.get_vblank_counter = radeon_get_vblank_counter_kms,
 	.enable_vblank = radeon_enable_vblank_kms,
 	.disable_vblank = radeon_disable_vblank_kms,
 	.get_vblank_timestamp = radeon_get_vblank_timestamp_kms,
 	.get_scanout_position = radeon_get_crtc_scanoutpos,
-#if defined(CONFIG_DEBUG_FS)
-	.debugfs_init = radeon_debugfs_init,
-	.debugfs_cleanup = radeon_debugfs_cleanup,
-#endif
 	.irq_preinstall = radeon_driver_irq_preinstall_kms,
 	.irq_postinstall = radeon_driver_irq_postinstall_kms,
 	.irq_uninstall = radeon_driver_irq_uninstall_kms,
@@ -386,18 +373,24 @@ static struct drm_driver kms_driver = {
 	.ioctls = radeon_ioctls_kms,
 	.gem_init_object = radeon_gem_object_init,
 	.gem_free_object = radeon_gem_object_free,
+#ifdef DUMBBELL_WIP
 	.gem_open_object = radeon_gem_object_open,
 	.gem_close_object = radeon_gem_object_close,
+#endif /* DUMBBELL_WIP */
 	.dma_ioctl = radeon_dma_ioctl_kms,
 	.dumb_create = radeon_mode_dumb_create,
 	.dumb_map_offset = radeon_mode_dumb_mmap,
 	.dumb_destroy = radeon_mode_dumb_destroy,
+#ifdef DUMBBELL_WIP
 	.fops = &radeon_driver_kms_fops,
+#endif /* DUMBBELL_WIP */
 
+#ifdef DUMBBELL_WIP
 	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
 	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
 	.gem_prime_export = radeon_gem_prime_export,
 	.gem_prime_import = radeon_gem_prime_import,
+#endif /* DUMBBELL_WIP */
 
 	.name = DRIVER_NAME,
 	.desc = DRIVER_DESC,
@@ -407,23 +400,7 @@ static struct drm_driver kms_driver = {
 	.patchlevel = KMS_DRIVER_PATCHLEVEL,
 };
 
-static struct drm_driver *driver;
-static struct pci_driver *pdriver;
-
-static struct pci_driver radeon_pci_driver = {
-	.name = DRIVER_NAME,
-	.id_table = pciidlist,
-};
-
-static struct pci_driver radeon_kms_pci_driver = {
-	.name = DRIVER_NAME,
-	.id_table = pciidlist,
-	.probe = radeon_pci_probe,
-	.remove = radeon_pci_remove,
-	.suspend = radeon_pci_suspend,
-	.resume = radeon_pci_resume,
-};
-
+#ifdef DUMBBELL_WIP
 static int __init radeon_init(void)
 {
 	driver = &driver_old;
@@ -466,10 +443,50 @@ static void __exit radeon_exit(void)
 	drm_pci_exit(driver, pdriver);
 	radeon_unregister_atpx_handler();
 }
+#endif /* DUMBBELL_WIP */
 
-module_init(radeon_init);
-module_exit(radeon_exit);
+/* =================================================================== */
 
-MODULE_AUTHOR(DRIVER_AUTHOR);
-MODULE_DESCRIPTION(DRIVER_DESC);
-MODULE_LICENSE("GPL and additional rights");
+static int
+radeon_probe(device_t kdev)
+{
+
+	return drm_probe(kdev, pciidlist);
+}
+
+static int
+radeon_attach(device_t kdev)
+{
+	struct drm_device *dev;
+
+	dev = device_get_softc(kdev);
+	if (radeon_modeset == 1)
+		kms_driver.driver_features |= DRIVER_MODESET;
+	dev->driver = &kms_driver;
+	return (drm_attach(kdev, pciidlist));
+}
+
+static device_method_t radeon_methods[] = {
+	/* Device interface */
+	DEVMETHOD(device_probe,		radeon_probe),
+	DEVMETHOD(device_attach,	radeon_attach),
+	//DEVMETHOD(device_suspend,	radeon_suspend),
+	//DEVMETHOD(device_resume,	radeon_resume),
+	DEVMETHOD(device_detach,	drm_detach),
+	DEVMETHOD_END
+};
+
+static driver_t radeon_driver = {
+	"drmn",
+	radeon_methods,
+	sizeof(struct drm_device)
+};
+
+extern devclass_t drm_devclass;
+DRIVER_MODULE_ORDERED(radeonkms, vgapci, radeon_driver, drm_devclass,
+    NULL, NULL, SI_ORDER_ANY);
+MODULE_DEPEND(radeonkms, drmn, 1, 1, 1);
+MODULE_DEPEND(radeonkms, agp, 1, 1, 1);
+//MODULE_DEPEND(radeonkms, iicbus, 1, 1, 1);
+//MODULE_DEPEND(radeonkms, iic, 1, 1, 1);
+//MODULE_DEPEND(radeonkms, iicbb, 1, 1, 1);

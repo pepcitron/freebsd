@@ -29,15 +29,17 @@
  *    Thomas Hellstrom <thomas-at-tungstengraphics-dot-com>
  *    Dave Airlie
  */
-#include <ttm/ttm_bo_api.h>
-#include <ttm/ttm_bo_driver.h>
-#include <ttm/ttm_placement.h>
-#include <ttm/ttm_module.h>
-#include <ttm/ttm_page_alloc.h>
-#include <drm/drmP.h>
-#include <drm/radeon_drm.h>
-#include <linux/seq_file.h>
-#include <linux/slab.h>
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/ttm/ttm_bo_api.h>
+#include <dev/drm2/ttm/ttm_bo_driver.h>
+#include <dev/drm2/ttm/ttm_placement.h>
+#include <dev/drm2/ttm/ttm_module.h>
+#include <dev/drm2/ttm/ttm_page_alloc.h>
+#include <dev/drm2/drmP.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 #include "radeon_reg.h"
 #include "radeon.h"
 
@@ -200,7 +202,7 @@ static void radeon_evict_flags(struct ttm_buffer_object *bo,
 	*placement = rbo->placement;
 }
 
-static int radeon_verify_access(struct ttm_buffer_object *bo, struct file *filp)
+static int radeon_verify_access(struct ttm_buffer_object *bo)
 {
 	return 0;
 }
@@ -210,7 +212,7 @@ static void radeon_move_null(struct ttm_buffer_object *bo,
 {
 	struct ttm_mem_reg *old_mem = &bo->mem;
 
-	BUG_ON(old_mem->mm_node != NULL);
+	KASSERT(old_mem->mm_node == NULL, ("old_mem->mm_node != NULL"));
 	*old_mem = *new_mem;
 	new_mem->mm_node = NULL;
 }
@@ -257,7 +259,7 @@ static int radeon_move_blit(struct ttm_buffer_object *bo,
 		return -EINVAL;
 	}
 
-	BUILD_BUG_ON((PAGE_SIZE % RADEON_GPU_PAGE_SIZE) != 0);
+	CTASSERT((PAGE_SIZE % RADEON_GPU_PAGE_SIZE) == 0);
 
 	/* sync other rings */
 	fence = bo->sync_obj;
@@ -514,7 +516,7 @@ static int radeon_ttm_backend_bind(struct ttm_tt *ttm,
 
 	gtt->offset = (unsigned long)(bo_mem->start << PAGE_SHIFT);
 	if (!ttm->num_pages) {
-		WARN(1, "nothing to bind %lu pages for mreg %p back %p!\n",
+		DRM_ERROR("nothing to bind %lu pages for mreg %p back %p!\n",
 		     ttm->num_pages, bo_mem, ttm);
 	}
 	r = radeon_gart_bind(gtt->rdev, gtt->offset,
@@ -540,7 +542,7 @@ static void radeon_ttm_backend_destroy(struct ttm_tt *ttm)
 	struct radeon_ttm_tt *gtt = (void *)ttm;
 
 	ttm_dma_tt_fini(&gtt->ttm);
-	kfree(gtt);
+	free(gtt, DRM_MEM_DRIVER);
 }
 
 static struct ttm_backend_func radeon_backend_func = {
@@ -551,7 +553,7 @@ static struct ttm_backend_func radeon_backend_func = {
 
 static struct ttm_tt *radeon_ttm_tt_create(struct ttm_bo_device *bdev,
 				    unsigned long size, uint32_t page_flags,
-				    struct page *dummy_read_page)
+				    vm_page_t dummy_read_page)
 {
 	struct radeon_device *rdev;
 	struct radeon_ttm_tt *gtt;
@@ -559,19 +561,20 @@ static struct ttm_tt *radeon_ttm_tt_create(struct ttm_bo_device *bdev,
 	rdev = radeon_get_rdev(bdev);
 #if __OS_HAS_AGP
 	if (rdev->flags & RADEON_IS_AGP) {
-		return ttm_agp_tt_create(bdev, rdev->ddev->agp->bridge,
+		return ttm_agp_tt_create(bdev, rdev->ddev->agp->agpdev,
 					 size, page_flags, dummy_read_page);
 	}
 #endif
 
-	gtt = kzalloc(sizeof(struct radeon_ttm_tt), GFP_KERNEL);
+	gtt = malloc(sizeof(struct radeon_ttm_tt),
+	    DRM_MEM_DRIVER, M_WAITOK | M_ZERO);
 	if (gtt == NULL) {
 		return NULL;
 	}
 	gtt->ttm.ttm.func = &radeon_backend_func;
 	gtt->rdev = rdev;
 	if (ttm_dma_tt_init(&gtt->ttm, bdev, size, page_flags, dummy_read_page)) {
-		kfree(gtt);
+		free(gtt, DRM_MEM_DRIVER);
 		return NULL;
 	}
 	return &gtt->ttm.ttm;
@@ -580,26 +583,38 @@ static struct ttm_tt *radeon_ttm_tt_create(struct ttm_bo_device *bdev,
 static int radeon_ttm_tt_populate(struct ttm_tt *ttm)
 {
 	struct radeon_device *rdev;
+#ifdef DUMBBELL_WIP
 	struct radeon_ttm_tt *gtt = (void *)ttm;
 	unsigned i;
+#endif /* DUMBBELL_WIP */
 	int r;
+#ifdef DUMBBELL_WIP
 	bool slave = !!(ttm->page_flags & TTM_PAGE_FLAG_SG);
+#endif /* DUMBBELL_WIP */
 
 	if (ttm->state != tt_unpopulated)
 		return 0;
 
+#ifdef DUMBBELL_WIP
+	/*
+	 * Maybe unneeded on FreeBSD.
+	 *   -- dumbbell@
+	 */
 	if (slave && ttm->sg) {
 		drm_prime_sg_to_page_addr_arrays(ttm->sg, ttm->pages,
 						 gtt->ttm.dma_address, ttm->num_pages);
 		ttm->state = tt_unbound;
 		return 0;
 	}
+#endif /* DUMBBELL_WIP */
 
 	rdev = radeon_get_rdev(ttm->bdev);
 #if __OS_HAS_AGP
+#ifdef DUMBBELL_WIP
 	if (rdev->flags & RADEON_IS_AGP) {
 		return ttm_agp_tt_populate(ttm);
 	}
+#endif /* DUMBBELL_WIP */
 #endif
 
 #ifdef CONFIG_SWIOTLB
@@ -613,6 +628,7 @@ static int radeon_ttm_tt_populate(struct ttm_tt *ttm)
 		return r;
 	}
 
+#ifdef DUMBBELL_WIP
 	for (i = 0; i < ttm->num_pages; i++) {
 		gtt->ttm.dma_address[i] = pci_map_page(rdev->pdev, ttm->pages[i],
 						       0, PAGE_SIZE,
@@ -627,14 +643,17 @@ static int radeon_ttm_tt_populate(struct ttm_tt *ttm)
 			return -EFAULT;
 		}
 	}
+#endif /* DUMBBELL_WIP */
 	return 0;
 }
 
 static void radeon_ttm_tt_unpopulate(struct ttm_tt *ttm)
 {
 	struct radeon_device *rdev;
+#ifdef DUMBBELL_WIP
 	struct radeon_ttm_tt *gtt = (void *)ttm;
 	unsigned i;
+#endif /* DUMBBELL_WIP */
 	bool slave = !!(ttm->page_flags & TTM_PAGE_FLAG_SG);
 
 	if (slave)
@@ -642,10 +661,12 @@ static void radeon_ttm_tt_unpopulate(struct ttm_tt *ttm)
 
 	rdev = radeon_get_rdev(ttm->bdev);
 #if __OS_HAS_AGP
+#ifdef DUMBBELL_WIP
 	if (rdev->flags & RADEON_IS_AGP) {
 		ttm_agp_tt_unpopulate(ttm);
 		return;
 	}
+#endif /* DUMBBELL_WIP */
 #endif
 
 #ifdef CONFIG_SWIOTLB
@@ -655,12 +676,14 @@ static void radeon_ttm_tt_unpopulate(struct ttm_tt *ttm)
 	}
 #endif
 
+#ifdef DUMBBELL_WIP
 	for (i = 0; i < ttm->num_pages; i++) {
 		if (gtt->ttm.dma_address[i]) {
 			pci_unmap_page(rdev->pdev, gtt->ttm.dma_address[i],
 				       PAGE_SIZE, PCI_DMA_BIDIRECTIONAL);
 		}
 	}
+#endif /* DUMBBELL_WIP */
 
 	ttm_pool_unpopulate(ttm);
 }
@@ -734,7 +757,9 @@ int radeon_ttm_init(struct radeon_device *rdev)
 	}
 	DRM_INFO("radeon: %uM of GTT memory ready.\n",
 		 (unsigned)(rdev->mc.gtt_size / (1024 * 1024)));
+#ifdef DUMBBELL_WIP
 	rdev->mman.bdev.dev_mapping = rdev->ddev->dev_mapping;
+#endif /* DUMBBELL_WIP */
 
 	r = radeon_ttm_debugfs_init(rdev);
 	if (r) {
@@ -781,6 +806,7 @@ void radeon_ttm_set_active_vram_size(struct radeon_device *rdev, u64 size)
 	man->size = size >> PAGE_SHIFT;
 }
 
+#ifdef DUMBBELL_WIP
 static struct vm_operations_struct radeon_ttm_vm_ops;
 static const struct vm_operations_struct *ttm_vm_ops = NULL;
 
@@ -828,6 +854,7 @@ int radeon_mmap(struct file *filp, struct vm_area_struct *vma)
 	vma->vm_ops = &radeon_ttm_vm_ops;
 	return 0;
 }
+#endif /* DUMBBELL_WIP */
 
 
 #define RADEON_DEBUGFS_MEM_TYPES 2

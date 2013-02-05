@@ -23,22 +23,17 @@
  * Authors: Dave Airlie
  *          Alex Deucher
  */
-#include <drm/drmP.h>
-#include <drm/drm_edid.h>
-#include <drm/drm_crtc_helper.h>
-#include <drm/drm_fb_helper.h>
-#include <drm/radeon_drm.h>
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
+#include <dev/drm2/drm_edid.h>
+#include <dev/drm2/drm_crtc_helper.h>
+#include <dev/drm2/drm_fb_helper.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 #include "radeon.h"
 #include "atom.h"
-
-extern void
-radeon_combios_connected_scratch_regs(struct drm_connector *connector,
-				      struct drm_encoder *encoder,
-				      bool connected);
-extern void
-radeon_atombios_connected_scratch_regs(struct drm_connector *connector,
-				       struct drm_encoder *encoder,
-				       bool connected);
 
 void radeon_connector_hotplug(struct drm_connector *connector)
 {

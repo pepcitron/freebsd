@@ -1487,10 +1487,13 @@ static bool radeon_legacy_ext_dac_detect(struct drm_encoder *encoder,
 		if (found)
 			break;
 
+		DRM_MDELAY(1);
+#ifdef DUMBBELL_WIP /* See above. */
 		if (!drm_can_sleep())
-			mdelay(1);
+			DRM_MDELAY(1);
 		else
 			msleep(1);
+#endif /* DUMBBELL_WIP */
 	}
 
 	/* restore the regs we used */

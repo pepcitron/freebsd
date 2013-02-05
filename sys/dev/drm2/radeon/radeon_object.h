@@ -25,11 +25,21 @@
  *          Alex Deucher
  *          Jerome Glisse
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
 #ifndef __RADEON_OBJECT_H__
 #define __RADEON_OBJECT_H__
 
-#include <drm/radeon_drm.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 #include "radeon.h"
+
+/*
+ * Undefine max_offset (defined in vm/vm_map.h), because it conflicts
+ * with an argument of the function radeon_bo_pin_restricted().
+ */
+#undef max_offset
 
 /**
  * radeon_mem_type_to_domain - return domain corresponding to mem_type
@@ -129,8 +139,10 @@ extern void radeon_bo_fini(struct radeon_device *rdev);
 extern void radeon_bo_list_add_object(struct radeon_bo_list *lobj,
 				struct list_head *head);
 extern int radeon_bo_list_validate(struct list_head *head);
+#ifdef DUMBBELL_WIP
 extern int radeon_bo_fbdev_mmap(struct radeon_bo *bo,
 				struct vm_area_struct *vma);
+#endif /* DUMBBELL_WIP */
 extern int radeon_bo_set_tiling_flags(struct radeon_bo *bo,
 				u32 tiling_flags, u32 pitch);
 extern void radeon_bo_get_tiling_flags(struct radeon_bo *bo,
@@ -153,7 +165,7 @@ static inline uint64_t radeon_sa_bo_gpu_addr(struct radeon_sa_bo *sa_bo)
 
 static inline void * radeon_sa_bo_cpu_addr(struct radeon_sa_bo *sa_bo)
 {
-	return sa_bo->manager->cpu_ptr + sa_bo->soffset;
+	return (char *)sa_bo->manager->cpu_ptr + sa_bo->soffset;
 }
 
 extern int radeon_sa_bo_manager_init(struct radeon_device *rdev,

@@ -28,11 +28,11 @@
  *    Gareth Hughes <gareth@valinux.com>
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
 #ifndef __RADEON_DRV_H__
 #define __RADEON_DRV_H__
-
-#include <linux/firmware.h>
-#include <linux/platform_device.h>
 
 #include "radeon_family.h"
 
@@ -302,7 +302,7 @@ typedef struct drm_radeon_private {
 	int r600_npipes;
 	int r600_nbanks;
 
-	struct mutex cs_mutex;
+	struct mtx cs_mutex;
 	u32 cs_id_scnt;
 	u32 cs_id_wcnt;
 	/* r6xx/r7xx drm blit vertex buffer */

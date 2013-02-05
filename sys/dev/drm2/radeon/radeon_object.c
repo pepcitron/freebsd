@@ -29,12 +29,16 @@
  *    Thomas Hellstrom <thomas-at-tungstengraphics-dot-com>
  *    Dave Airlie
  */
-#include <linux/list.h>
-#include <linux/slab.h>
-#include <drm/drmP.h>
-#include <drm/radeon_drm.h>
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 #include "radeon.h"
+#ifdef DUMBBELL_WIP
 #include "radeon_trace.h"
+#endif /* DUMBBELL_WIP */
 
 
 int radeon_ttm_init(struct radeon_device *rdev);

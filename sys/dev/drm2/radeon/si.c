@@ -21,6 +21,10 @@
  *
  * Authors: Alex Deucher
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
 #include <linux/firmware.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
@@ -57,10 +61,6 @@ MODULE_FIRMWARE("radeon/VERDE_rlc.bin");
 
 extern int r600_ih_ring_alloc(struct radeon_device *rdev);
 extern void r600_ih_ring_fini(struct radeon_device *rdev);
-extern void evergreen_fix_pci_max_read_req_size(struct radeon_device *rdev);
-extern void evergreen_mc_stop(struct radeon_device *rdev, struct evergreen_mc_save *save);
-extern void evergreen_mc_resume(struct radeon_device *rdev, struct evergreen_mc_save *save);
-extern u32 evergreen_get_number_of_dram_channels(struct radeon_device *rdev);
 
 /* get temperature in millidegrees */
 int si_get_temp(struct radeon_device *rdev)

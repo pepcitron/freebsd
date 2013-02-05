@@ -26,12 +26,12 @@
  *          Jerome Glisse
  */
 
-#include <linux/console.h>
-#include <drm/drmP.h>
-#include <drm/drm_crtc_helper.h>
-#include <drm/radeon_drm.h>
-#include <linux/vgaarb.h>
-#include <linux/vga_switcheroo.h>
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
+#include <dev/drm2/drm_crtc_helper.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 #include "radeon_reg.h"
 #include "radeon.h"
 #include "radeon_asic.h"
@@ -52,8 +52,7 @@
  */
 static uint32_t radeon_invalid_rreg(struct radeon_device *rdev, uint32_t reg)
 {
-	DRM_ERROR("Invalid callback to read register 0x%04X\n", reg);
-	BUG_ON(1);
+	panic("Invalid callback to read register 0x%04X\n", reg);
 	return 0;
 }
 
@@ -69,9 +68,8 @@ static uint32_t radeon_invalid_rreg(struct radeon_device *rdev, uint32_t reg)
  */
 static void radeon_invalid_wreg(struct radeon_device *rdev, uint32_t reg, uint32_t v)
 {
-	DRM_ERROR("Invalid callback to write register 0x%04X with 0x%08X\n",
+	panic("Invalid callback to write register 0x%04X with 0x%08X\n",
 		  reg, v);
-	BUG_ON(1);
 }
 
 /**

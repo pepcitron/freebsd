@@ -23,12 +23,15 @@
  * Authors: Dave Airlie
  *          Alex Deucher
  */
-#include <drm/drmP.h>
-#include <drm/drm_crtc_helper.h>
-#include <drm/radeon_drm.h>
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
+#include <dev/drm2/drm_crtc_helper.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 #include "radeon.h"
 #include "atom.h"
-#include <linux/backlight.h>
 
 extern int atom_debug;
 
@@ -195,7 +198,7 @@ void radeon_atom_backlight_init(struct radeon_encoder *radeon_encoder,
 	if (!(rdev->mode_info.firmware_flags & ATOM_BIOS_INFO_BL_CONTROLLED_BY_GPU))
 		return;
 
-	pdata = kmalloc(sizeof(struct radeon_backlight_privdata), GFP_KERNEL);
+	pdata = malloc(sizeof(struct radeon_backlight_privdata), DRM_MEM_DRIVER, M_WAITOK);
 	if (!pdata) {
 		DRM_ERROR("Memory allocation failed\n");
 		goto error;
@@ -229,7 +232,7 @@ void radeon_atom_backlight_init(struct radeon_encoder *radeon_encoder,
 	return;
 
 error:
-	kfree(pdata);
+	free(pdata, DRM_MEM_DRIVER);
 	return;
 }
 
@@ -258,7 +261,7 @@ static void radeon_atom_backlight_exit(struct radeon_encoder *radeon_encoder)
 
 		pdata = bl_get_data(bd);
 		backlight_device_unregister(bd);
-		kfree(pdata);
+		free(pdata, DRM_MEM_DRIVER);
 
 		DRM_INFO("radeon atom LVDS backlight unloaded\n");
 	}
@@ -266,7 +269,8 @@ static void radeon_atom_backlight_exit(struct radeon_encoder *radeon_encoder)
 
 #else /* !CONFIG_BACKLIGHT_CLASS_DEVICE */
 
-void radeon_atom_backlight_init(struct radeon_encoder *encoder)
+void radeon_atom_backlight_init(struct radeon_encoder *radeon_encoder,
+				struct drm_connector *drm_connector)
 {
 }
 
@@ -275,10 +279,6 @@ static void radeon_atom_backlight_exit(struct radeon_encoder *encoder)
 }
 
 #endif
-
-/* evil but including atombios.h is much worse */
-bool radeon_atom_get_tv_timings(struct radeon_device *rdev, int index,
-				struct drm_display_mode *mode);
 
 
 static inline bool radeon_encoder_is_digital(struct drm_encoder *encoder)
@@ -1343,7 +1343,7 @@ atombios_set_edp_panel_power(struct drm_connector *connector, int action)
 		for (i = 0; i < 300; i++) {
 			if (radeon_hpd_sense(rdev, radeon_connector->hpd.hpd))
 				return true;
-			mdelay(1);
+			DRM_MDELAY(1);
 		}
 		return false;
 	}
@@ -1934,9 +1934,9 @@ atombios_apply_encoder_quirks(struct drm_encoder *encoder,
 	struct radeon_crtc *radeon_crtc = to_radeon_crtc(encoder->crtc);
 
 	/* Funky macbooks */
-	if ((dev->pdev->device == 0x71C5) &&
-	    (dev->pdev->subsystem_vendor == 0x106b) &&
-	    (dev->pdev->subsystem_device == 0x0080)) {
+	if ((dev->pci_device == 0x71C5) &&
+	    (dev->pci_subvendor == 0x106b) &&
+	    (dev->pci_subdevice == 0x0080)) {
 		if (radeon_encoder->devices & ATOM_DEVICE_LCD1_SUPPORT) {
 			uint32_t lvtma_bit_depth_control = RREG32(AVIVO_LVTMA_BIT_DEPTH_CONTROL);
 
@@ -2492,9 +2492,9 @@ void radeon_enc_destroy(struct drm_encoder *encoder)
 	struct radeon_encoder *radeon_encoder = to_radeon_encoder(encoder);
 	if (radeon_encoder->devices & (ATOM_DEVICE_LCD_SUPPORT))
 		radeon_atom_backlight_exit(radeon_encoder);
-	kfree(radeon_encoder->enc_priv);
+	free(radeon_encoder->enc_priv, DRM_MEM_DRIVER);
 	drm_encoder_cleanup(encoder);
-	kfree(radeon_encoder);
+	free(radeon_encoder, DRM_MEM_DRIVER);
 }
 
 static const struct drm_encoder_funcs radeon_atom_enc_funcs = {
@@ -2506,7 +2506,8 @@ radeon_atombios_set_dac_info(struct radeon_encoder *radeon_encoder)
 {
 	struct drm_device *dev = radeon_encoder->base.dev;
 	struct radeon_device *rdev = dev->dev_private;
-	struct radeon_encoder_atom_dac *dac = kzalloc(sizeof(struct radeon_encoder_atom_dac), GFP_KERNEL);
+	struct radeon_encoder_atom_dac *dac = malloc(sizeof(struct radeon_encoder_atom_dac),
+	    DRM_MEM_DRIVER, M_ZERO | M_WAITOK);
 
 	if (!dac)
 		return NULL;
@@ -2519,7 +2520,8 @@ static struct radeon_encoder_atom_dig *
 radeon_atombios_set_dig_info(struct radeon_encoder *radeon_encoder)
 {
 	int encoder_enum = (radeon_encoder->encoder_enum & ENUM_ID_MASK) >> ENUM_ID_SHIFT;
-	struct radeon_encoder_atom_dig *dig = kzalloc(sizeof(struct radeon_encoder_atom_dig), GFP_KERNEL);
+	struct radeon_encoder_atom_dig *dig = malloc(sizeof(struct radeon_encoder_atom_dig),
+	    DRM_MEM_DRIVER, M_ZERO | M_WAITOK);
 
 	if (!dig)
 		return NULL;
@@ -2557,7 +2559,8 @@ radeon_add_atom_encoder(struct drm_device *dev,
 	}
 
 	/* add a new one */
-	radeon_encoder = kzalloc(sizeof(struct radeon_encoder), GFP_KERNEL);
+	radeon_encoder = malloc(sizeof(struct radeon_encoder),
+	    DRM_MEM_DRIVER, M_ZERO | M_WAITOK);
 	if (!radeon_encoder)
 		return;
 

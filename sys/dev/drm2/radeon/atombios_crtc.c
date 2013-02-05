@@ -23,10 +23,14 @@
  * Authors: Dave Airlie
  *          Alex Deucher
  */
-#include <drm/drmP.h>
-#include <drm/drm_crtc_helper.h>
-#include <drm/radeon_drm.h>
-#include <drm/drm_fixed.h>
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
+#include <dev/drm2/drm_crtc_helper.h>
+#include <dev/drm2/radeon/radeon_drm.h>
+#include <dev/drm2/drm_fixed.h>
 #include "radeon.h"
 #include "atom.h"
 #include "atom-bits.h"

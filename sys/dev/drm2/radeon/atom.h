@@ -22,11 +22,13 @@
  * Author: Stanislaw Skowronek
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
 #ifndef ATOM_H
 #define ATOM_H
 
-#include <linux/types.h>
-#include <drm/drmP.h>
+#include <dev/drm2/drmP.h>
 
 #define ATOM_BIOS_MAGIC		0xAA55
 #define ATOM_ATI_MAGIC_PTR	0x30
@@ -124,7 +126,7 @@ struct card_info {
 
 struct atom_context {
 	struct card_info *card;
-	struct mutex mutex;
+	struct sx mutex;
 	void *bios;
 	uint32_t cmd_table, data_table;
 	uint16_t *iio;

@@ -224,7 +224,7 @@ intel_dp_max_data_rate(int max_link_clock, int max_lanes)
 
 static bool
 intel_dp_adjust_dithering(struct intel_dp *intel_dp,
-			  struct drm_display_mode *mode,
+			  const struct drm_display_mode *mode,
 			  struct drm_display_mode *adjusted_mode)
 {
 	int max_link_clock = intel_dp_link_clock(intel_dp_max_link_bw(intel_dp));
@@ -676,7 +676,7 @@ intel_dp_i2c_init(struct intel_dp *intel_dp,
 }
 
 static bool
-intel_dp_mode_fixup(struct drm_encoder *encoder, struct drm_display_mode *mode,
+intel_dp_mode_fixup(struct drm_encoder *encoder, const struct drm_display_mode *mode,
 		    struct drm_display_mode *adjusted_mode)
 {
 	struct drm_device *dev = encoder->dev;
@@ -695,7 +695,9 @@ intel_dp_mode_fixup(struct drm_encoder *encoder, struct drm_display_mode *mode,
 		 * the mode->clock is used to calculate the Data&Link M/N
 		 * of the pipe. For the eDP the fixed clock should be used.
 		 */
+#ifdef DUMBBELL_WIP
 		mode->clock = intel_dp->panel_fixed_mode->clock;
+#endif /* DUMBBELL_DIP */
 	}
 
 	if (!intel_dp_adjust_dithering(intel_dp, mode, adjusted_mode))

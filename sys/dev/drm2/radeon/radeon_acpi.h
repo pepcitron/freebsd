@@ -21,14 +21,15 @@
  *
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
 #ifndef RADEON_ACPI_H
 #define RADEON_ACPI_H
 
 struct radeon_device;
-struct acpi_bus_event;
 
-int radeon_atif_handler(struct radeon_device *rdev,
-		struct acpi_bus_event *event);
+void radeon_atif_handler(struct radeon_device *rdev, UINT32 type);
 
 /* AMD hw uses four ACPI control methods:
  * 1. ATIF

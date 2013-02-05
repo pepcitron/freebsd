@@ -26,14 +26,17 @@
  *          Jerome Glisse
  *          Christian König
  */
-#include <linux/seq_file.h>
-#include <linux/slab.h>
-#include <drm/drmP.h>
-#include <drm/radeon_drm.h>
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 #include "radeon_reg.h"
 #include "radeon.h"
 #include "atom.h"
 
+#ifdef DUMBBELL_WIP
 /*
  * IB
  * IBs (Indirect Buffers) and areas of GPU accessible memory where
@@ -237,6 +240,7 @@ void radeon_ib_pool_fini(struct radeon_device *rdev)
 		rdev->ib_pool_ready = false;
 	}
 }
+#endif /* DUMBBELL_WIP */
 
 /**
  * radeon_ib_ring_tests - test IBs on the rings
@@ -278,6 +282,7 @@ int radeon_ib_ring_tests(struct radeon_device *rdev)
 	return 0;
 }
 
+#ifdef DUMBBELL_WIP
 /*
  * Rings
  * Most engines on the GPU are fed via ring buffers.  Ring
@@ -857,3 +862,4 @@ static int radeon_debugfs_sa_init(struct radeon_device *rdev)
 	return 0;
 #endif
 }
+#endif /* DUMBBELL_WIP */

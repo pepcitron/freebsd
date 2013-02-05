@@ -25,14 +25,15 @@
  *          Alex Deucher
  *          Jerome Glisse
  */
-#include <drm/drmP.h>
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
 #include "radeon_reg.h"
 #include "radeon.h"
 #include "atom.h"
 
-#include <linux/vga_switcheroo.h>
-#include <linux/slab.h>
-#include <linux/acpi.h>
 /*
  * BIOS.
  */
@@ -45,14 +46,18 @@
  */
 static bool igp_read_bios_from_vram(struct radeon_device *rdev)
 {
+#ifdef DUMBBELL_WIP
 	uint8_t __iomem *bios;
 	resource_size_t vram_base;
 	resource_size_t size = 256 * 1024; /* ??? */
+#endif /* DUMBBELL_WIP */
 
 	if (!(rdev->flags & RADEON_IS_IGP))
 		if (!radeon_card_posted(rdev))
 			return false;
 
+	return false;
+#ifdef DUMBBELL_WIP
 	rdev->bios = NULL;
 	vram_base = pci_resource_start(rdev->pdev, 0);
 	bios = ioremap(vram_base, size);
@@ -64,7 +69,7 @@ static bool igp_read_bios_from_vram(struct radeon_device *rdev)
 		iounmap(bios);
 		return false;
 	}
-	rdev->bios = kmalloc(size, GFP_KERNEL);
+	rdev->bios = malloc(size, DRM_MEM_DRIVER, M_WAITOK);
 	if (rdev->bios == NULL) {
 		iounmap(bios);
 		return false;
@@ -72,10 +77,13 @@ static bool igp_read_bios_from_vram(struct radeon_device *rdev)
 	memcpy_fromio(rdev->bios, bios, size);
 	iounmap(bios);
 	return true;
+#endif /* DUMBBELL_WIP */
 }
 
 static bool radeon_read_bios(struct radeon_device *rdev)
 {
+	return false;
+#ifdef DUMBBELL_WIP
 	uint8_t __iomem *bios;
 	size_t size;
 
@@ -97,9 +105,9 @@ static bool radeon_read_bios(struct radeon_device *rdev)
 	}
 	pci_unmap_rom(rdev->pdev, bios);
 	return true;
+#endif /* DUMBBELL_WIP */
 }
 
-#ifdef CONFIG_ACPI
 /* ATRM is used to get the BIOS on the discrete cards in
  * dual-gpu systems.
  */
@@ -117,33 +125,33 @@ static bool radeon_read_bios(struct radeon_device *rdev)
  * vbios image on PX systems (all asics).
  * Returns the length of the buffer fetched.
  */
-static int radeon_atrm_call(acpi_handle atrm_handle, uint8_t *bios,
+static int radeon_atrm_call(ACPI_HANDLE atrm_handle, uint8_t *bios,
 			    int offset, int len)
 {
-	acpi_status status;
-	union acpi_object atrm_arg_elements[2], *obj;
-	struct acpi_object_list atrm_arg;
-	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL};
+	ACPI_STATUS status;
+	ACPI_OBJECT atrm_arg_elements[2], *obj;
+	ACPI_OBJECT_LIST atrm_arg;
+	ACPI_BUFFER buffer = { ACPI_ALLOCATE_BUFFER, NULL};
 
-	atrm_arg.count = 2;
-	atrm_arg.pointer = &atrm_arg_elements[0];
+	atrm_arg.Count = 2;
+	atrm_arg.Pointer = &atrm_arg_elements[0];
 
-	atrm_arg_elements[0].type = ACPI_TYPE_INTEGER;
-	atrm_arg_elements[0].integer.value = offset;
+	atrm_arg_elements[0].Type = ACPI_TYPE_INTEGER;
+	atrm_arg_elements[0].Integer.Value = offset;
 
-	atrm_arg_elements[1].type = ACPI_TYPE_INTEGER;
-	atrm_arg_elements[1].integer.value = len;
+	atrm_arg_elements[1].Type = ACPI_TYPE_INTEGER;
+	atrm_arg_elements[1].Integer.Value = len;
 
-	status = acpi_evaluate_object(atrm_handle, NULL, &atrm_arg, &buffer);
+	status = AcpiEvaluateObject(atrm_handle, NULL, &atrm_arg, &buffer);
 	if (ACPI_FAILURE(status)) {
-		printk("failed to evaluate ATRM got %s\n", acpi_format_exception(status));
+		DRM_ERROR("failed to evaluate ATRM got %s\n", AcpiFormatException(status));
 		return -ENODEV;
 	}
 
-	obj = (union acpi_object *)buffer.pointer;
-	memcpy(bios+offset, obj->buffer.pointer, obj->buffer.length);
-	len = obj->buffer.length;
-	kfree(buffer.pointer);
+	obj = (ACPI_OBJECT *)buffer.Pointer;
+	memcpy(bios+offset, obj->Buffer.Pointer, obj->Buffer.Length);
+	len = obj->Buffer.Length;
+	AcpiOsFree(buffer.Pointer);
 	return len;
 }
 
@@ -152,31 +160,24 @@ static bool radeon_atrm_get_bios(struct radeon_device *rdev)
 	int ret;
 	int size = 256 * 1024;
 	int i;
-	struct pci_dev *pdev = NULL;
-	acpi_handle dhandle, atrm_handle;
-	acpi_status status;
+	ACPI_HANDLE dhandle, atrm_handle;
+	ACPI_STATUS status;
 	bool found = false;
 
 	/* ATRM is for the discrete card only */
 	if (rdev->flags & RADEON_IS_IGP)
 		return false;
 
-	while ((pdev = pci_get_class(PCI_CLASS_DISPLAY_VGA << 8, pdev)) != NULL) {
-		dhandle = DEVICE_ACPI_HANDLE(&pdev->dev);
-		if (!dhandle)
-			continue;
-
-		status = acpi_get_handle(dhandle, "ATRM", &atrm_handle);
-		if (!ACPI_FAILURE(status)) {
-			found = true;
-			break;
-		}
+	dhandle = rdev->acpi.handle; /*XXX -- dumbbell@ */
+	status = AcpiGetHandle(dhandle, "ATRM", &atrm_handle);
+	if (!ACPI_FAILURE(status)) {
+		found = true;
 	}
 
 	if (!found)
 		return false;
 
-	rdev->bios = kmalloc(size, GFP_KERNEL);
+	rdev->bios = malloc(size, DRM_MEM_DRIVER, M_WAITOK);
 	if (!rdev->bios) {
 		DRM_ERROR("Unable to allocate bios\n");
 		return false;
@@ -192,17 +193,11 @@ static bool radeon_atrm_get_bios(struct radeon_device *rdev)
 	}
 
 	if (i == 0 || rdev->bios[0] != 0x55 || rdev->bios[1] != 0xaa) {
-		kfree(rdev->bios);
+		free(rdev->bios, DRM_MEM_DRIVER);
 		return false;
 	}
 	return true;
 }
-#else
-static inline bool radeon_atrm_get_bios(struct radeon_device *rdev)
-{
-	return false;
-}
-#endif
 
 static bool ni_read_disabled_bios(struct radeon_device *rdev)
 {
@@ -472,6 +467,8 @@ static bool legacy_read_disabled_bios(struct radeon_device *rdev)
 	crtc_ext_cntl = RREG32(RADEON_CRTC_EXT_CNTL);
 	fp2_gen_cntl = 0;
 
+#define	PCI_DEVICE_ID_ATI_RADEON_QY	0x5159
+
 	if (rdev->ddev->pci_device == PCI_DEVICE_ID_ATI_RADEON_QY) {
 		fp2_gen_cntl = RREG32(RADEON_FP2_GEN_CNTL);
 	}
@@ -626,7 +623,7 @@ bool radeon_get_bios(struct radeon_device *rdev)
 		return false;
 	}
 	if (rdev->bios[0] != 0x55 || rdev->bios[1] != 0xaa) {
-		printk("BIOS signature incorrect %x %x\n", rdev->bios[0], rdev->bios[1]);
+		DRM_ERROR("BIOS signature incorrect %x %x\n", rdev->bios[0], rdev->bios[1]);
 		goto free_bios;
 	}
 
@@ -651,7 +648,7 @@ bool radeon_get_bios(struct radeon_device *rdev)
 	DRM_DEBUG("%sBIOS detected\n", rdev->is_atom_bios ? "ATOM" : "COM");
 	return true;
 free_bios:
-	kfree(rdev->bios);
+	free(rdev->bios, DRM_MEM_DRIVER);
 	rdev->bios = NULL;
 	return false;
 }

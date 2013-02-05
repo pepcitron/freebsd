@@ -134,7 +134,7 @@ struct drm_file;
 #define DRIVER_IRQ_VBL2    0x800
 #define DRIVER_GEM         0x1000
 #define DRIVER_MODESET     0x2000
-#define DRIVER_USE_PLATFORM_DEVICE  0x4000
+#define DRIVER_PRIME       0x4000
 #define	DRIVER_LOCKLESS_IRQ 0x8000
 
 
@@ -263,6 +263,7 @@ typedef int64_t s64;
 typedef int32_t s32;
 typedef int16_t s16;
 typedef int8_t s8;
+typedef int32_t __be32;
 
 /* DRM_READMEMORYBARRIER() prevents reordering of reads.
  * DRM_WRITEMEMORYBARRIER() prevents reordering of writes.
@@ -311,11 +312,22 @@ typedef int8_t s8;
 #define DRM_GET_USER_UNCHECKED(val, uaddr)		\
 	((val) = fuword32(uaddr), 0)
 
+#define cpu_to_le16(x) htole16(x)
+#define le16_to_cpu(x) le16toh(x)
 #define cpu_to_le32(x) htole32(x)
 #define le32_to_cpu(x) le32toh(x)
 
+#define cpu_to_be16(x) htobe16(x)
+#define be16_to_cpu(x) be16toh(x)
+#define cpu_to_be32(x) htobe32(x)
+#define be32_to_cpu(x) be32toh(x)
+#define be32_to_cpup(x) be32toh(*x)
+
 #define DRM_HZ			hz
 #define DRM_UDELAY(udelay)	DELAY(udelay)
+#define DRM_MDELAY(msecs)	do { int loops = (msecs);		\
+	                          while (loops--) DELAY(1000);		\
+				} while (0)
 #define DRM_TIME_SLICE		(hz/20)  /* Time slice for GLXContexts	  */
 
 #define DRM_GET_PRIV_SAREA(_dev, _ctx, _map) do {	\
@@ -366,6 +378,18 @@ for ( ret = 0 ; !ret && !(condition) ; ) {			\
 	if ((drm_debug_flag & DRM_DEBUGBITS_KMS) != 0)			\
 		printf("[" DRM_NAME ":KMS:pid%d:%s] " fmt, DRM_CURRENTPID,\
 			__func__ , ##__VA_ARGS__);			\
+} while (0)
+
+#define	dev_err(dev, fmt, ...)						\
+	device_printf((dev), "error: " fmt, ## __VA_ARGS__)
+#define	dev_warn(dev, fmt, ...)						\
+	device_printf((dev), "warning: " fmt, ## __VA_ARGS__)
+#define	dev_info(dev, fmt, ...)						\
+	device_printf((dev), "info: " fmt, ## __VA_ARGS__)
+#define	dev_dbg(dev, fmt, ...) do {					\
+	if ((drm_debug_flag& DRM_DEBUGBITS_KMS) != 0) {			\
+		device_printf((dev), "debug: " fmt, ## __VA_ARGS__);	\
+	}								\
 } while (0)
 
 typedef struct drm_pci_id_list
@@ -474,6 +498,14 @@ struct drm_pending_event {
 	void (*destroy)(struct drm_pending_event *event);
 };
 
+/* initial implementaton using a linked list - todo hashtab */
+struct drm_prime_file_private {
+	struct list_head head;
+#ifdef DUMBBELL_WIP
+	struct mutex lock;
+#endif /* DUMBBELL_WIP */
+};
+
 typedef TAILQ_HEAD(drm_file_list, drm_file) drm_file_list_t;
 struct drm_file {
 	TAILQ_ENTRY(drm_file) link;
@@ -496,6 +528,8 @@ struct drm_file {
 	struct list_head  event_list;
 	int		  event_space;
 	struct selinfo	  event_poll;
+
+	struct drm_prime_file_private prime;
 };
 
 typedef struct drm_lock_data {
@@ -682,6 +716,14 @@ struct drm_gem_object {
 	uint32_t pending_write_domain;
 
 	void *driver_private;
+
+#ifdef DUMBBELL_WIP
+	/* dma buf exported from this GEM object */
+	struct dma_buf *export_dma_buf;
+
+	/* dma buf attachment backing this object */
+	struct dma_buf_attachment *import_attach;
+#endif /* DUMBBELL_WIP */
 };
 
 #include "drm_crtc.h"
@@ -825,8 +867,10 @@ struct drm_device {
 	struct drm_driver_info *driver;
 	drm_pci_id_list_t *id_entry;	/* PCI ID, name, and chipset private */
 
-	u_int16_t pci_device;		/* PCI device id */
-	u_int16_t pci_vendor;		/* PCI vendor id */
+	uint16_t pci_device;		/* PCI device id */
+	uint16_t pci_vendor;		/* PCI vendor id */
+	uint16_t pci_subdevice;		/* PCI subsystem device id */
+	uint16_t pci_subvendor;		/* PCI subsystem vendor id */
 
 	char		  *unique;	/* Unique identifier: e.g., busid  */
 	int		  unique_len;	/* Length of unique field	   */
@@ -1021,6 +1065,41 @@ int drm_add_busid_modesetting(struct drm_device *dev,
 extern int		drm_open_helper(struct cdev *kdev, int flags, int fmt,
 					 DRM_STRUCTPROC *p,
 					struct drm_device *dev);
+
+#ifdef DUMBBELL_WIP
+extern int drm_gem_prime_handle_to_fd(struct drm_device *dev,
+		struct drm_file *file_priv, uint32_t handle, uint32_t flags,
+		int *prime_fd);
+extern int drm_gem_prime_fd_to_handle(struct drm_device *dev,
+		struct drm_file *file_priv, int prime_fd, uint32_t *handle);
+
+extern int drm_prime_handle_to_fd_ioctl(struct drm_device *dev, void *data,
+					struct drm_file *file_priv);
+extern int drm_prime_fd_to_handle_ioctl(struct drm_device *dev, void *data,
+					struct drm_file *file_priv);
+
+#ifdef DUMBBELL_WIP
+/*
+ * See drm_prime.c
+ *   -- dumbbell@
+ */
+extern int drm_prime_sg_to_page_addr_arrays(struct sg_table *sgt, vm_page_t *pages,
+					    dma_addr_t *addrs, int max_pages);
+#endif /* DUMBBELL_WIP */
+extern struct sg_table *drm_prime_pages_to_sg(vm_page_t *pages, int nr_pages);
+extern void drm_prime_gem_destroy(struct drm_gem_object *obj, struct sg_table *sg);
+
+
+void drm_prime_init_file_private(struct drm_prime_file_private *prime_fpriv);
+void drm_prime_destroy_file_private(struct drm_prime_file_private *prime_fpriv);
+int drm_prime_add_imported_buf_handle(struct drm_prime_file_private *prime_fpriv, struct dma_buf *dma_buf, uint32_t handle);
+int drm_prime_lookup_imported_buf_handle(struct drm_prime_file_private *prime_fpriv, struct dma_buf *dma_buf, uint32_t *handle);
+void drm_prime_remove_imported_buf_handle(struct drm_prime_file_private *prime_fpriv, struct dma_buf *dma_buf);
+
+int drm_prime_add_dma_buf(struct drm_device *dev, struct drm_gem_object *obj);
+int drm_prime_lookup_obj(struct drm_device *dev, struct dma_buf *buf,
+			 struct drm_gem_object **obj);
+#endif /* DUMBBELL_WIP */
 
 /* Memory management support (drm_memory.c) */
 void	drm_mem_init(void);
@@ -1406,6 +1485,33 @@ do {									\
 
 #define	KTR_DRM		KTR_DEV
 #define	KTR_DRM_REG	KTR_SPARE3
+
+/* Added by dumbbell@ for radeon. */
+#define DRM_PCIE_SPEED_25 1
+#define DRM_PCIE_SPEED_50 2
+#define DRM_PCIE_SPEED_80 4
+
+extern int drm_pcie_get_speed_cap_mask(struct drm_device *dev, u32 *speed_mask);
+
+#define	do_div(a, b)		((a) /= (b))
+#define	lower_32_bits(n)	((u32)(n))
+
+#define min_t(type, x, y) ({			\
+	type __min1 = (x);			\
+	type __min2 = (y);			\
+	__min1 < __min2 ? __min1 : __min2; })
+
+#define max_t(type, x, y) ({			\
+	type __max1 = (x);			\
+	type __max2 = (y);			\
+	__max1 > __max2 ? __max1 : __max2; })
+
+#define	memset_io(a, b, c)	memset((a), (b), (c))
+#define	memcpy_fromio(a, b, c)	memcpy((a), (b), (c))
+#define	memcpy_toio(a, b, c)	memcpy((a), (b), (c))
+
+#define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
+#define	hweight32(i)	bitcount32(i)
 
 #endif /* __KERNEL__ */
 #endif /* _DRM_P_H_ */

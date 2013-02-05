@@ -27,16 +27,17 @@
  * Kernel port Author: Dave Airlie
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
 #ifndef RADEON_MODE_H
 #define RADEON_MODE_H
 
-#include <drm/drm_crtc.h>
-#include <drm/drm_edid.h>
-#include <drm/drm_dp_helper.h>
-#include <drm/drm_fixed.h>
-#include <drm/drm_crtc_helper.h>
-#include <linux/i2c.h>
-#include <linux/i2c-algo-bit.h>
+#include <dev/drm2/drm_crtc.h>
+#include <dev/drm2/drm_edid.h>
+#include <dev/drm2/drm_dp_helper.h>
+#include <dev/drm2/drm_fixed.h>
+#include <dev/drm2/drm_crtc_helper.h>
 
 struct radeon_bo;
 struct radeon_device;
@@ -185,12 +186,16 @@ struct radeon_pll {
 };
 
 struct radeon_i2c_chan {
+#ifdef DUMBBELL_WIP
 	struct i2c_adapter adapter;
+#endif /* DUMBBELL_WIP */
 	struct drm_device *dev;
+#ifdef DUMBBELL_WIP
 	union {
 		struct i2c_algo_bit_data bit;
 		struct i2c_algo_dp_aux_data dp;
 	} algo;
+#endif /* DUMBBELL_WIP */
 	struct radeon_i2c_bus_rec rec;
 };
 
@@ -428,7 +433,9 @@ struct radeon_connector_atom_dig {
 	uint32_t igp_lane_info;
 	/* displayport */
 	struct radeon_i2c_chan *dp_i2c_bus;
+#ifdef DUMBBELL_WIP
 	u8 dpcd[DP_RECEIVER_CAP_SIZE];
+#endif /* DUMBBELL_WIP */
 	u8 dp_sink_type;
 	int dp_clock;
 	int dp_lane_count;

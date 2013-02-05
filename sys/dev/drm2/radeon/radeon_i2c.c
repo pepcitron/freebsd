@@ -23,14 +23,17 @@
  * Authors: Dave Airlie
  *          Alex Deucher
  */
-#include <linux/export.h>
 
-#include <drm/drmP.h>
-#include <drm/drm_edid.h>
-#include <drm/radeon_drm.h>
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
+#include <dev/drm2/drm_edid.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 #include "radeon.h"
 #include "atom.h"
 
+#ifdef DUMBBELL_WIP
 extern int radeon_atom_hw_i2c_xfer(struct i2c_adapter *i2c_adap,
 				   struct i2c_msg *msgs, int num);
 extern u32 radeon_atom_hw_i2c_func(struct i2c_adapter *adap);
@@ -1008,13 +1011,16 @@ out_free:
 	return NULL;
 
 }
+#endif /* DUMBBELL_WIP */
 
 void radeon_i2c_destroy(struct radeon_i2c_chan *i2c)
 {
 	if (!i2c)
 		return;
+#ifdef DUMBBELL_WIP
 	i2c_del_adapter(&i2c->adapter);
-	kfree(i2c);
+#endif /* DUMBBELL_WIP */
+	free(i2c, DRM_MEM_DRIVER);
 }
 
 /* Add the default buses */
@@ -1039,6 +1045,7 @@ void radeon_i2c_fini(struct radeon_device *rdev)
 	}
 }
 
+#ifdef DUMBBELL_WIP
 /* Add additional buses */
 void radeon_i2c_add(struct radeon_device *rdev,
 		    struct radeon_i2c_bus_rec *rec,
@@ -1186,3 +1193,4 @@ void radeon_router_select_cd_port(struct radeon_connector *radeon_connector)
 			    0x1, val);
 }
 
+#endif /* DUMBBELL_WIP */

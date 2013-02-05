@@ -21,6 +21,10 @@
  *
  * Authors: Alex Deucher
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
 #ifndef __EVERGREEN_REG_H__
 #define __EVERGREEN_REG_H__
 

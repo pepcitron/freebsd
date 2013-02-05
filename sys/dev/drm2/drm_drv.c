@@ -262,6 +262,8 @@ int drm_attach(device_t kdev, drm_pci_id_list_t *idlist)
 
 	dev->pci_vendor = pci_get_vendor(dev->device);
 	dev->pci_device = pci_get_device(dev->device);
+	dev->pci_subvendor = pci_get_subvendor(dev->device);
+	dev->pci_subdevice = pci_get_subdevice(dev->device);
 
 	if (drm_core_check_feature(dev, DRIVER_HAVE_IRQ)) {
 		if (drm_msi &&

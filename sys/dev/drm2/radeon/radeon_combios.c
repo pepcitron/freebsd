@@ -24,8 +24,12 @@
  * Authors: Dave Airlie
  *          Alex Deucher
  */
-#include <drm/drmP.h>
-#include <drm/radeon_drm.h>
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 #include "radeon.h"
 #include "atom.h"
 
@@ -457,14 +461,14 @@ bool radeon_combios_check_hardcoded_edid(struct radeon_device *rdev)
 
 	raw = rdev->bios + edid_info;
 	size = EDID_LENGTH * (raw[0x7e] + 1);
-	edid = kmalloc(size, GFP_KERNEL);
+	edid = malloc(size, DRM_MEM_DRIVER, M_WAITOK);
 	if (edid == NULL)
 		return false;
 
 	memcpy((unsigned char *)edid, raw, size);
 
 	if (!drm_edid_is_valid(edid)) {
-		kfree(edid);
+		free(edid, DRM_MEM_DRIVER);
 		return false;
 	}
 
@@ -480,7 +484,8 @@ radeon_bios_get_hardcoded_edid(struct radeon_device *rdev)
 	struct edid *edid;
 
 	if (rdev->mode_info.bios_hardcoded_edid) {
-		edid = kmalloc(rdev->mode_info.bios_hardcoded_edid_size, GFP_KERNEL);
+		edid = malloc(rdev->mode_info.bios_hardcoded_edid_size,
+		    DRM_MEM_DRIVER, M_WAITOK);
 		if (edid) {
 			memcpy((unsigned char *)edid,
 			       (unsigned char *)rdev->mode_info.bios_hardcoded_edid,
@@ -946,8 +951,8 @@ struct radeon_encoder_primary_dac *radeon_combios_get_primary_dac_info(struct
 	struct radeon_encoder_primary_dac *p_dac = NULL;
 	int found = 0;
 
-	p_dac = kzalloc(sizeof(struct radeon_encoder_primary_dac),
-			GFP_KERNEL);
+	p_dac = malloc(sizeof(struct radeon_encoder_primary_dac),
+			DRM_MEM_DRIVER, M_WAITOK | M_ZERO);
 
 	if (!p_dac)
 		return NULL;
@@ -1082,7 +1087,8 @@ struct radeon_encoder_tv_dac *radeon_combios_get_tv_dac_info(struct
 	struct radeon_encoder_tv_dac *tv_dac = NULL;
 	int found = 0;
 
-	tv_dac = kzalloc(sizeof(struct radeon_encoder_tv_dac), GFP_KERNEL);
+	tv_dac = malloc(sizeof(struct radeon_encoder_tv_dac),
+	    DRM_MEM_DRIVER, M_WAITOK | M_ZERO);
 	if (!tv_dac)
 		return NULL;
 
@@ -1170,7 +1176,8 @@ static struct radeon_encoder_lvds *radeon_legacy_get_lvds_info_from_regs(struct
 	uint32_t ppll_div_sel, ppll_val;
 	uint32_t lvds_ss_gen_cntl = RREG32(RADEON_LVDS_SS_GEN_CNTL);
 
-	lvds = kzalloc(sizeof(struct radeon_encoder_lvds), GFP_KERNEL);
+	lvds = malloc(sizeof(struct radeon_encoder_lvds),
+	    DRM_MEM_DRIVER, M_WAITOK | M_ZERO);
 
 	if (!lvds)
 		return NULL;
@@ -1245,7 +1252,8 @@ struct radeon_encoder_lvds *radeon_combios_get_lvds_info(struct radeon_encoder
 	lcd_info = combios_get_table_offset(dev, COMBIOS_LCD_INFO_TABLE);
 
 	if (lcd_info) {
-		lvds = kzalloc(sizeof(struct radeon_encoder_lvds), GFP_KERNEL);
+		lvds = malloc(sizeof(struct radeon_encoder_lvds),
+		    DRM_MEM_DRIVER, M_WAITOK | M_ZERO);
 
 		if (!lvds)
 			return NULL;
@@ -1564,21 +1572,21 @@ bool radeon_get_legacy_connector_info_from_table(struct drm_device *dev)
 			/* PowerMac8,1 ? */
 			/* imac g5 isight */
 			rdev->mode_info.connector_table = CT_IMAC_G5_ISIGHT;
-		} else if ((rdev->pdev->device == 0x4a48) &&
-			   (rdev->pdev->subsystem_vendor == 0x1002) &&
-			   (rdev->pdev->subsystem_device == 0x4a48)) {
+		} else if ((dev->pci_device == 0x4a48) &&
+			   (dev->pci_subvendor == 0x1002) &&
+			   (dev->pci_subdevice == 0x4a48)) {
 			/* Mac X800 */
 			rdev->mode_info.connector_table = CT_MAC_X800;
 		} else if ((of_machine_is_compatible("PowerMac7,2") ||
 			    of_machine_is_compatible("PowerMac7,3")) &&
-			   (rdev->pdev->device == 0x4150) &&
-			   (rdev->pdev->subsystem_vendor == 0x1002) &&
-			   (rdev->pdev->subsystem_device == 0x4150)) {
+			   (dev->pci_device == 0x4150) &&
+			   (dev->pci_subvendor == 0x1002) &&
+			   (dev->pci_subdevice == 0x4150)) {
 			/* Mac G5 tower 9600 */
 			rdev->mode_info.connector_table = CT_MAC_G5_9600;
-		} else if ((rdev->pdev->device == 0x4c66) &&
-			   (rdev->pdev->subsystem_vendor == 0x1002) &&
-			   (rdev->pdev->subsystem_device == 0x4c66)) {
+		} else if ((dev->pci_device == 0x4c66) &&
+			   (dev->pci_subvendor == 0x1002) &&
+			   (dev->pci_subdevice == 0x4c66)) {
 			/* SAM440ep RV250 embedded board */
 			rdev->mode_info.connector_table = CT_SAM440EP;
 		} else
@@ -2284,17 +2292,17 @@ static bool radeon_apply_legacy_quirks(struct drm_device *dev,
 
 	/* Certain IBM chipset RN50s have a BIOS reporting two VGAs,
 	   one with VGA DDC and one with CRT2 DDC. - kill the CRT2 DDC one */
-	if (dev->pdev->device == 0x515e &&
-	    dev->pdev->subsystem_vendor == 0x1014) {
+	if (dev->pci_device == 0x515e &&
+	    dev->pci_subvendor == 0x1014) {
 		if (*legacy_connector == CONNECTOR_CRT_LEGACY &&
 		    ddc_i2c->mask_clk_reg == RADEON_GPIO_CRT2_DDC)
 			return false;
 	}
 
 	/* X300 card with extra non-existent DVI port */
-	if (dev->pdev->device == 0x5B60 &&
-	    dev->pdev->subsystem_vendor == 0x17af &&
-	    dev->pdev->subsystem_device == 0x201e && bios_index == 2) {
+	if (dev->pci_device == 0x5B60 &&
+	    dev->pci_subvendor == 0x17af &&
+	    dev->pci_subdevice == 0x201e && bios_index == 2) {
 		if (*legacy_connector == CONNECTOR_DVI_I_LEGACY)
 			return false;
 	}
@@ -2305,21 +2313,21 @@ static bool radeon_apply_legacy_quirks(struct drm_device *dev,
 static bool radeon_apply_legacy_tv_quirks(struct drm_device *dev)
 {
 	/* Acer 5102 has non-existent TV port */
-	if (dev->pdev->device == 0x5975 &&
-	    dev->pdev->subsystem_vendor == 0x1025 &&
-	    dev->pdev->subsystem_device == 0x009f)
+	if (dev->pci_device == 0x5975 &&
+	    dev->pci_subvendor == 0x1025 &&
+	    dev->pci_subdevice == 0x009f)
 		return false;
 
 	/* HP dc5750 has non-existent TV port */
-	if (dev->pdev->device == 0x5974 &&
-	    dev->pdev->subsystem_vendor == 0x103c &&
-	    dev->pdev->subsystem_device == 0x280a)
+	if (dev->pci_device == 0x5974 &&
+	    dev->pci_subvendor == 0x103c &&
+	    dev->pci_subdevice == 0x280a)
 		return false;
 
 	/* MSI S270 has non-existent TV port */
-	if (dev->pdev->device == 0x5955 &&
-	    dev->pdev->subsystem_vendor == 0x1462 &&
-	    dev->pdev->subsystem_device == 0x0131)
+	if (dev->pci_device == 0x5955 &&
+	    dev->pci_subvendor == 0x1462 &&
+	    dev->pci_subdevice == 0x0131)
 		return false;
 
 	return true;
@@ -2694,13 +2702,16 @@ void radeon_combios_get_power_modes(struct radeon_device *rdev)
 	rdev->pm.default_power_state_index = -1;
 
 	/* allocate 2 power states */
-	rdev->pm.power_state = kzalloc(sizeof(struct radeon_power_state) * 2, GFP_KERNEL);
+	rdev->pm.power_state = malloc(sizeof(struct radeon_power_state) * 2,
+	    DRM_MEM_DRIVER, M_WAITOK | M_ZERO);
 	if (rdev->pm.power_state) {
 		/* allocate 1 clock mode per state */
 		rdev->pm.power_state[0].clock_info =
-			kzalloc(sizeof(struct radeon_pm_clock_info) * 1, GFP_KERNEL);
+			malloc(sizeof(struct radeon_pm_clock_info) * 1,
+			    DRM_MEM_DRIVER, M_WAITOK | M_ZERO);
 		rdev->pm.power_state[1].clock_info =
-			kzalloc(sizeof(struct radeon_pm_clock_info) * 1, GFP_KERNEL);
+			malloc(sizeof(struct radeon_pm_clock_info) * 1,
+			    DRM_MEM_DRIVER, M_WAITOK | M_ZERO);
 		if (!rdev->pm.power_state[0].clock_info ||
 		    !rdev->pm.power_state[1].clock_info)
 			goto pm_failed;
@@ -2745,23 +2756,26 @@ void radeon_combios_get_power_modes(struct radeon_device *rdev)
 				i2c_bus = combios_setup_i2c_bus(rdev, gpio, 0, 0);
 			rdev->pm.i2c_bus = radeon_i2c_lookup(rdev, &i2c_bus);
 			if (rdev->pm.i2c_bus) {
+#ifdef DUMBBELL_WIP
 				struct i2c_board_info info = { };
 				const char *name = thermal_controller_names[thermal_controller];
 				info.addr = i2c_addr >> 1;
 				strlcpy(info.type, name, sizeof(info.type));
 				i2c_new_device(&rdev->pm.i2c_bus->adapter, &info);
+#endif /* DUMBBELL_WIP */
 			}
 		}
 	} else {
 		/* boards with a thermal chip, but no overdrive table */
 
 		/* Asus 9600xt has an f75375 on the monid bus */
-		if ((dev->pdev->device == 0x4152) &&
-		    (dev->pdev->subsystem_vendor == 0x1043) &&
-		    (dev->pdev->subsystem_device == 0xc002)) {
+		if ((dev->pci_device == 0x4152) &&
+		    (dev->pci_subvendor == 0x1043) &&
+		    (dev->pci_subdevice == 0xc002)) {
 			i2c_bus = combios_setup_i2c_bus(rdev, DDC_MONID, 0, 0);
 			rdev->pm.i2c_bus = radeon_i2c_lookup(rdev, &i2c_bus);
 			if (rdev->pm.i2c_bus) {
+#ifdef DUMBBELL_WIP
 				struct i2c_board_info info = { };
 				const char *name = "f75375";
 				info.addr = 0x28;
@@ -2769,6 +2783,7 @@ void radeon_combios_get_power_modes(struct radeon_device *rdev)
 				i2c_new_device(&rdev->pm.i2c_bus->adapter, &info);
 				DRM_INFO("Possible %s thermal controller at 0x%02x\n",
 					 name, info.addr);
+#endif /* DUMBBELL_WIP */
 			}
 		}
 	}
@@ -2972,12 +2987,12 @@ bool radeon_combios_external_tmds_setup(struct drm_encoder *encoder)
 					case 3:
 						val = RBIOS16(index);
 						index += 2;
-						udelay(val);
+						DRM_UDELAY(val);
 						break;
 					case 4:
 						val = RBIOS16(index);
 						index += 2;
-						mdelay(val);
+						DRM_MDELAY(val);
 						break;
 					case 6:
 						slave_addr = id & 0xff;
@@ -3026,7 +3041,7 @@ bool radeon_combios_external_tmds_setup(struct drm_encoder *encoder)
 				case 4:
 					val = RBIOS16(index);
 					index += 2;
-					udelay(val);
+					DRM_UDELAY(val);
 					break;
 				case 5:
 					reg = id & 0x1fff;
@@ -3104,7 +3119,7 @@ static void combios_parse_mmio_table(struct drm_device *dev, uint16_t offset)
 			case 4:
 				val = RBIOS16(offset);
 				offset += 2;
-				udelay(val);
+				DRM_UDELAY(val);
 				break;
 			case 5:
 				val = RBIOS16(offset);
@@ -3173,10 +3188,10 @@ static void combios_parse_pll_table(struct drm_device *dev, uint16_t offset)
 				tmp = 1000;
 				switch (addr) {
 				case 1:
-					udelay(150);
+					DRM_UDELAY(150);
 					break;
 				case 2:
-					mdelay(1);
+					DRM_MDELAY(1);
 					break;
 				case 3:
 					while (tmp--) {
@@ -3207,13 +3222,13 @@ static void combios_parse_pll_table(struct drm_device *dev, uint16_t offset)
 						/*mclk_cntl |= 0x00001111;*//* ??? */
 						WREG32_PLL(RADEON_MCLK_CNTL,
 							   mclk_cntl);
-						mdelay(10);
+						DRM_MDELAY(10);
 #endif
 						WREG32_PLL
 						    (RADEON_CLK_PWRMGT_CNTL,
 						     tmp &
 						     ~RADEON_CG_NO1_DEBUG_0);
-						mdelay(10);
+						DRM_MDELAY(10);
 					}
 					break;
 				default:
@@ -3418,24 +3433,24 @@ void radeon_combios_asic_init(struct drm_device *dev)
 	 * - it hangs on resume inside the dynclk 1 table.
 	 */
 	if (rdev->family == CHIP_RS480 &&
-	    rdev->pdev->subsystem_vendor == 0x103c &&
-	    rdev->pdev->subsystem_device == 0x308b)
+	    dev->pci_subvendor == 0x103c &&
+	    dev->pci_subdevice == 0x308b)
 		return;
 
 	/* quirk for rs4xx HP dv5000 laptop to make it resume
 	 * - it hangs on resume inside the dynclk 1 table.
 	 */
 	if (rdev->family == CHIP_RS480 &&
-	    rdev->pdev->subsystem_vendor == 0x103c &&
-	    rdev->pdev->subsystem_device == 0x30a4)
+	    dev->pci_subvendor == 0x103c &&
+	    dev->pci_subdevice == 0x30a4)
 		return;
 
 	/* quirk for rs4xx Compaq Presario V5245EU laptop to make it resume
 	 * - it hangs on resume inside the dynclk 1 table.
 	 */
 	if (rdev->family == CHIP_RS480 &&
-	    rdev->pdev->subsystem_vendor == 0x103c &&
-	    rdev->pdev->subsystem_device == 0x30ae)
+	    dev->pci_subvendor == 0x103c &&
+	    dev->pci_subdevice == 0x30ae)
 		return;
 
 	/* DYN CLK 1 */

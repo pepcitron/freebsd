@@ -24,13 +24,17 @@
  *          Alex Deucher
  *          Jerome Glisse
  */
-#include <drm/drmP.h>
-#include <drm/radeon_drm.h>
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 #include "radeon.h"
 
 #include "atom.h"
 #include "atom-bits.h"
-#include <drm/drm_dp_helper.h>
+#include <dev/drm2/drm_dp_helper.h>
 
 /* move these to drm_dp_helper.c/h */
 #define DP_LINK_CONFIGURATION_SIZE 9
@@ -136,7 +140,7 @@ static int radeon_dp_aux_native_write(struct radeon_connector *radeon_connector,
 		if ((ack & AUX_NATIVE_REPLY_MASK) == AUX_NATIVE_REPLY_ACK)
 			return send_bytes;
 		else if ((ack & AUX_NATIVE_REPLY_MASK) == AUX_NATIVE_REPLY_DEFER)
-			udelay(400);
+			DRM_UDELAY(400);
 		else
 			return -EIO;
 	}
@@ -169,7 +173,7 @@ static int radeon_dp_aux_native_read(struct radeon_connector *radeon_connector,
 		if ((ack & AUX_NATIVE_REPLY_MASK) == AUX_NATIVE_REPLY_ACK)
 			return ret;
 		else if ((ack & AUX_NATIVE_REPLY_MASK) == AUX_NATIVE_REPLY_DEFER)
-			udelay(400);
+			DRM_UDELAY(400);
 		else if (ret == 0)
 			return -EPROTO;
 		else
@@ -258,7 +262,7 @@ int radeon_dp_i2c_aux_ch(struct i2c_adapter *adapter, int mode,
 			return -EREMOTEIO;
 		case AUX_NATIVE_REPLY_DEFER:
 			DRM_DEBUG_KMS("aux_ch native defer\n");
-			udelay(400);
+			DRM_UDELAY(400);
 			continue;
 		default:
 			DRM_ERROR("aux_ch invalid native reply 0x%02x\n", ack);
@@ -275,7 +279,7 @@ int radeon_dp_i2c_aux_ch(struct i2c_adapter *adapter, int mode,
 			return -EREMOTEIO;
 		case AUX_I2C_REPLY_DEFER:
 			DRM_DEBUG_KMS("aux_i2c defer\n");
-			udelay(400);
+			DRM_UDELAY(400);
 			break;
 		default:
 			DRM_ERROR("aux_i2c invalid reply 0x%02x\n", ack);
@@ -436,11 +440,11 @@ static void radeon_dp_probe_oui(struct radeon_connector *radeon_connector)
 		return;
 
 	if (radeon_dp_aux_native_read(radeon_connector, DP_SINK_OUI, buf, 3, 0))
-		DRM_DEBUG_KMS("Sink OUI: %02hx%02hx%02hx\n",
+		DRM_DEBUG_KMS("Sink OUI: %02hhx%02hhx%02hhx\n",
 			      buf[0], buf[1], buf[2]);
 
 	if (radeon_dp_aux_native_read(radeon_connector, DP_BRANCH_OUI, buf, 3, 0))
-		DRM_DEBUG_KMS("Branch OUI: %02hx%02hx%02hx\n",
+		DRM_DEBUG_KMS("Branch OUI: %02hhx%02hhx%02hhx\n",
 			      buf[0], buf[1], buf[2]);
 }
 
@@ -682,7 +686,7 @@ static int radeon_dp_link_train_init(struct radeon_dp_link_train_info *dp_info)
 
 static int radeon_dp_link_train_finish(struct radeon_dp_link_train_info *dp_info)
 {
-	udelay(400);
+	DRM_UDELAY(400);
 
 	/* disable the training pattern on the sink */
 	radeon_write_dpcd_reg(dp_info->radeon_connector,
@@ -710,7 +714,7 @@ static int radeon_dp_link_train_cr(struct radeon_dp_link_train_info *dp_info)
 	memset(dp_info->train_set, 0, 4);
 	radeon_dp_update_vs_emph(dp_info);
 
-	udelay(400);
+	DRM_UDELAY(400);
 
 	/* clock recovery loop */
 	clock_recovery = false;

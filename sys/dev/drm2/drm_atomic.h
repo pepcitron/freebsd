@@ -35,6 +35,7 @@ __FBSDID("$FreeBSD$");
 /* Many of these implementations are rather fake, but good enough. */
 
 typedef u_int32_t atomic_t;
+typedef u_int64_t atomic64_t;
 
 #define atomic_set(p, v)	(*(p) = (v))
 #define atomic_read(p)		(*(p))
@@ -88,6 +89,17 @@ find_first_zero_bit(volatile void *p, int max)
 		}
 	}
 	return max;
+}
+
+static __inline int
+atomic_xchg(volatile int *p, int new)
+{
+	int old;
+
+	old = *p;
+	*p = new;
+
+	return (old);
 }
 
 #define	BITS_TO_LONGS(x) (howmany((x), NBBY * sizeof(long)))
