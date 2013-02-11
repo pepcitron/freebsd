@@ -23,7 +23,11 @@
  *
  * Authors: Christian König
  */
-#include <drm/drmP.h>
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
 #include "radeon.h"
 #include "radeon_reg.h"
 #include "radeon_asic.h"
@@ -118,10 +122,9 @@ struct r600_audio r600_audio_status(struct radeon_device *rdev)
 /*
  * update all hdmi interfaces with current audio parameters
  */
-void r600_audio_update_hdmi(struct work_struct *work)
+void r600_audio_update_hdmi(void *arg, int pending)
 {
-	struct radeon_device *rdev = container_of(work, struct radeon_device,
-						  audio_work);
+	struct radeon_device *rdev = arg;
 	struct drm_device *dev = rdev->ddev;
 	struct r600_audio audio_status = r600_audio_status(rdev);
 	struct drm_encoder *encoder;

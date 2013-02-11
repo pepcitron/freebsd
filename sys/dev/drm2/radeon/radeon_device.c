@@ -102,7 +102,6 @@ static const char radeon_family_name[][16] = {
  *
  * Clear GPU surface registers (r1xx-r5xx).
  */
-#ifdef DUMBBELL_WIP
 void radeon_surface_init(struct radeon_device *rdev)
 {
 	/* FIXME: check this out */
@@ -119,7 +118,6 @@ void radeon_surface_init(struct radeon_device *rdev)
 		WREG32(RADEON_SURFACE_CNTL, 0);
 	}
 }
-#endif /* DUMBBELL_WIP */
 
 /*
  * GPU scratch registers helpers function.
@@ -205,7 +203,6 @@ void radeon_scratch_free(struct radeon_device *rdev, uint32_t reg)
  *
  * Disables Writeback (all asics).  Used for suspend.
  */
-#ifdef DUMBBELL_WIP
 void radeon_wb_disable(struct radeon_device *rdev)
 {
 	int r;
@@ -220,7 +217,6 @@ void radeon_wb_disable(struct radeon_device *rdev)
 	}
 	rdev->wb.enabled = false;
 }
-#endif /* DUMBBELL_WIP */
 
 /**
  * radeon_wb_fini - Disable Writeback and free memory
@@ -230,7 +226,6 @@ void radeon_wb_disable(struct radeon_device *rdev)
  * Disables Writeback and frees the Writeback memory (all asics).
  * Used at driver shutdown.
  */
-#ifdef DUMBBELL_WIP
 void radeon_wb_fini(struct radeon_device *rdev)
 {
 	radeon_wb_disable(rdev);
@@ -240,7 +235,6 @@ void radeon_wb_fini(struct radeon_device *rdev)
 		rdev->wb.wb_obj = NULL;
 	}
 }
-#endif /* DUMBBELL_WIP */
 
 /**
  * radeon_wb_init- Init Writeback driver info and allocate memory
@@ -251,7 +245,6 @@ void radeon_wb_fini(struct radeon_device *rdev)
  * Used at driver startup.
  * Returns 0 on success or an -error on failure.
  */
-#ifdef DUMBBELL_WIP
 int radeon_wb_init(struct radeon_device *rdev)
 {
 	int r;
@@ -317,7 +310,6 @@ int radeon_wb_init(struct radeon_device *rdev)
 
 	return 0;
 }
-#endif /* DUMBBELL_WIP */
 
 /**
  * radeon_vram_location - try to find VRAM location
@@ -360,7 +352,6 @@ int radeon_wb_init(struct radeon_device *rdev)
  *
  * FIXME: when reducing VRAM size align new size on power of 2.
  */
-#ifdef DUMBBELL_WIP
 void radeon_vram_location(struct radeon_device *rdev, struct radeon_mc *mc, u64 base)
 {
 	uint64_t limit = (uint64_t)radeon_vram_limit << 20;
@@ -380,11 +371,10 @@ void radeon_vram_location(struct radeon_device *rdev, struct radeon_mc *mc, u64 
 	mc->vram_end = mc->vram_start + mc->mc_vram_size - 1;
 	if (limit && limit < mc->real_vram_size)
 		mc->real_vram_size = limit;
-	dev_info(rdev->dev, "VRAM: %lluM 0x%016llX - 0x%016llX (%lluM used)\n",
+	dev_info(rdev->dev, "VRAM: %luM 0x%016lX - 0x%016lX (%luM used)\n",
 			mc->mc_vram_size >> 20, mc->vram_start,
 			mc->vram_end, mc->real_vram_size >> 20);
 }
-#endif /* DUMBBELL_WIP */
 
 /**
  * radeon_gtt_location - try to find GTT location
@@ -398,7 +388,6 @@ void radeon_vram_location(struct radeon_device *rdev, struct radeon_mc *mc, u64 
  *
  * FIXME: when reducing GTT size align new size on power of 2.
  */
-#ifdef DUMBBELL_WIP
 void radeon_gtt_location(struct radeon_device *rdev, struct radeon_mc *mc)
 {
 	u64 size_af, size_bf;
@@ -419,10 +408,9 @@ void radeon_gtt_location(struct radeon_device *rdev, struct radeon_mc *mc)
 		mc->gtt_start = (mc->vram_end + 1 + mc->gtt_base_align) & ~mc->gtt_base_align;
 	}
 	mc->gtt_end = mc->gtt_start + mc->gtt_size - 1;
-	dev_info(rdev->dev, "GTT: %lluM 0x%016llX - 0x%016llX\n",
+	dev_info(rdev->dev, "GTT: %luM 0x%016lX - 0x%016lX\n",
 			mc->gtt_size >> 20, mc->gtt_start, mc->gtt_end);
 }
-#endif /* DUMBBELL_WIP */
 
 /*
  * GPU helpers function.
@@ -436,13 +424,14 @@ void radeon_gtt_location(struct radeon_device *rdev, struct radeon_mc *mc)
  * Used at driver startup.
  * Returns true if initialized or false if not.
  */
-#ifdef DUMBBELL_WIP
 bool radeon_card_posted(struct radeon_device *rdev)
 {
 	uint32_t reg;
 
-	if (efi_enabled && rdev->pdev->subsystem_vendor == PCI_VENDOR_ID_APPLE)
+#ifdef DUMBBELL_WIP
+	if (efi_enabled && rdev->dev->pci_subvendor == PCI_VENDOR_ID_APPLE)
 		return false;
+#endif /* DUMBBELL_WIP */
 
 	/* first check CRTCs */
 	if (ASIC_IS_DCE41(rdev)) {
@@ -485,7 +474,6 @@ bool radeon_card_posted(struct radeon_device *rdev)
 	return false;
 
 }
-#endif /* DUMBBELL_WIP */
 
 /**
  * radeon_update_bandwidth_info - update display bandwidth params
@@ -524,7 +512,6 @@ void radeon_update_bandwidth_info(struct radeon_device *rdev)
  * it (all asics).
  * Returns true if initialized or false if not.
  */
-#ifdef DUMBBELL_WIP
 bool radeon_boot_test_post_card(struct radeon_device *rdev)
 {
 	if (radeon_card_posted(rdev))
@@ -542,7 +529,6 @@ bool radeon_boot_test_post_card(struct radeon_device *rdev)
 		return false;
 	}
 }
-#endif /* DUMBBELL_WIP */
 
 /**
  * radeon_dummy_page_init - init dummy page used by the driver
@@ -554,25 +540,25 @@ bool radeon_boot_test_post_card(struct radeon_device *rdev)
  * when pages are taken out of the GART
  * Returns 0 on sucess, -ENOMEM on failure.
  */
-#ifdef DUMBBELL_WIP
 int radeon_dummy_page_init(struct radeon_device *rdev)
 {
 	if (rdev->dummy_page.page)
 		return 0;
+#ifdef DUMBBELL_WIP
 	rdev->dummy_page.page = alloc_page(GFP_DMA32 | GFP_KERNEL | __GFP_ZERO);
 	if (rdev->dummy_page.page == NULL)
 		return -ENOMEM;
 	rdev->dummy_page.addr = pci_map_page(rdev->pdev, rdev->dummy_page.page,
 					0, PAGE_SIZE, PCI_DMA_BIDIRECTIONAL);
 	if (pci_dma_mapping_error(rdev->pdev, rdev->dummy_page.addr)) {
-		dev_err(&rdev->pdev->dev, "Failed to DMA MAP the dummy page\n");
+		dev_err(rdev->dev, "Failed to DMA MAP the dummy page\n");
 		__free_page(rdev->dummy_page.page);
 		rdev->dummy_page.page = NULL;
 		return -ENOMEM;
 	}
+#endif /* DUMBBELL_WIP */
 	return 0;
 }
-#endif /* DUMBBELL_WIP */
 
 /**
  * radeon_dummy_page_fini - free dummy page used by the driver
@@ -581,20 +567,19 @@ int radeon_dummy_page_init(struct radeon_device *rdev)
  *
  * Frees the dummy page used by the driver (all asics).
  */
-#ifdef DUMBBELL_WIP
 void radeon_dummy_page_fini(struct radeon_device *rdev)
 {
 	if (rdev->dummy_page.page == NULL)
 		return;
+#ifdef DUMBBELL_WIP
 	pci_unmap_page(rdev->pdev, rdev->dummy_page.addr,
 			PAGE_SIZE, PCI_DMA_BIDIRECTIONAL);
 	__free_page(rdev->dummy_page.page);
 	rdev->dummy_page.page = NULL;
-}
 #endif /* DUMBBELL_WIP */
+}
 
 
-#ifdef DUMBBELL_WIP
 /* ATOM accessor methods */
 /*
  * ATOM is an interpreted byte code stored in tables in the vbios.  The
@@ -739,7 +724,6 @@ static uint32_t cail_ioreg_read(struct card_info *info, uint32_t reg)
 	r = RREG32_IO(reg*4);
 	return r;
 }
-#endif /* DUMBBELL_WIP */
 
 /**
  * radeon_atombios_init - init the driver info and callbacks for atombios
@@ -751,11 +735,11 @@ static uint32_t cail_ioreg_read(struct card_info *info, uint32_t reg)
  * Returns 0 on sucess, -ENOMEM on failure.
  * Called at driver startup.
  */
-#ifdef DUMBBELL_WIP
 int radeon_atombios_init(struct radeon_device *rdev)
 {
 	struct card_info *atom_card_info =
-	    kzalloc(sizeof(struct card_info), GFP_KERNEL);
+	    malloc(sizeof(struct card_info),
+		DRM_MEM_DRIVER, M_ZERO | M_WAITOK);
 
 	if (!atom_card_info)
 		return -ENOMEM;
@@ -779,12 +763,12 @@ int radeon_atombios_init(struct radeon_device *rdev)
 	atom_card_info->pll_write = cail_pll_write;
 
 	rdev->mode_info.atom_context = atom_parse(atom_card_info, rdev->bios);
-	mutex_init(&rdev->mode_info.atom_context->mutex);
+	sx_init(&rdev->mode_info.atom_context->mutex,
+	    "drm__radeon_device__mode_info__atom_context__mutex");
 	radeon_atom_initialize_bios_scratch_regs(rdev->ddev);
 	atom_allocate_fb_scratch(rdev->mode_info.atom_context);
 	return 0;
 }
-#endif /* DUMBBELL_WIP */
 
 /**
  * radeon_atombios_fini - free the driver info and callbacks for atombios
@@ -795,16 +779,14 @@ int radeon_atombios_init(struct radeon_device *rdev)
  * interpreter (r4xx+).
  * Called at driver shutdown.
  */
-#ifdef DUMBBELL_WIP
 void radeon_atombios_fini(struct radeon_device *rdev)
 {
 	if (rdev->mode_info.atom_context) {
-		kfree(rdev->mode_info.atom_context->scratch);
-		kfree(rdev->mode_info.atom_context);
+		free(rdev->mode_info.atom_context->scratch, DRM_MEM_DRIVER);
+		free(rdev->mode_info.atom_context, DRM_MEM_DRIVER);
 	}
-	kfree(rdev->mode_info.atom_card_info);
+	free(rdev->mode_info.atom_card_info, DRM_MEM_DRIVER);
 }
-#endif /* DUMBBELL_WIP */
 
 /* COMBIOS */
 /*
@@ -822,13 +804,11 @@ void radeon_atombios_fini(struct radeon_device *rdev)
  * Returns 0 on sucess.
  * Called at driver startup.
  */
-#ifdef DUMBBELL_WIP
 int radeon_combios_init(struct radeon_device *rdev)
 {
 	radeon_combios_initialize_bios_scratch_regs(rdev->ddev);
 	return 0;
 }
-#endif /* DUMBBELL_WIP */
 
 /**
  * radeon_combios_fini - free the driver info for combios
@@ -838,12 +818,11 @@ int radeon_combios_init(struct radeon_device *rdev)
  * Frees the driver info for combios (r1xx-r3xx).
  * Called at driver shutdown.
  */
-#ifdef DUMBBELL_WIP
 void radeon_combios_fini(struct radeon_device *rdev)
 {
 }
-#endif /* DUMBBELL_WIP */
 
+#ifdef DUMBBELL_WIP
 /* if we get transitioned to only one device, take VGA back */
 /**
  * radeon_vga_set_decode - enable/disable vga decode
@@ -854,7 +833,6 @@ void radeon_combios_fini(struct radeon_device *rdev)
  * Enable/disable vga decode (all asics).
  * Returns VGA resource flags.
  */
-#ifdef DUMBBELL_WIP
 static unsigned int radeon_vga_set_decode(void *cookie, bool state)
 {
 	struct radeon_device *rdev = cookie;
@@ -1062,9 +1040,7 @@ int radeon_device_init(struct radeon_device *rdev,
 	sx_init(&rdev->gpu_clock_mutex, "drm__radeon_device__gpu_clock_mutex");
 	rw_init(&rdev->pm.mclk_lock, "drm__radeon_device__pm__mclk_lock");
 	rw_init(&rdev->exclusive_lock, "drm__radeon_device__exclusive_lock");
-#ifdef DUMBBELL_WIP
-	init_waitqueue_head(&rdev->irq.vblank_queue);
-#endif /* DUMBBELL_WIP */
+	DRM_INIT_WAITQUEUE(&rdev->irq.vblank_queue);
 	r = radeon_gem_init(rdev);
 	if (r)
 		return r;
@@ -1125,7 +1101,7 @@ int radeon_device_init(struct radeon_device *rdev,
 
 	/* Registers mapping */
 	/* TODO: block userspace mapping of io register */
-	mtx_init(&rdev->mmio_idx_lock, "drm__radeon_device__mmio_idx_lock", NULL, MTX_SPIN);
+	DRM_SPININIT(&rdev->mmio_idx_lock, "drm__radeon_device__mmio_idx_lock");
 	rdev->rmmio_rid = PCIR_BAR(2);
 	rdev->rmmio = bus_alloc_resource_any(rdev->dev, SYS_RES_MEMORY,
 	    &rdev->rmmio_rid, RF_ACTIVE | RF_SHAREABLE);
@@ -1152,6 +1128,9 @@ int radeon_device_init(struct radeon_device *rdev,
 	}
 	if (rdev->rio_mem == NULL)
 		DRM_ERROR("Unable to find PCI I/O BAR\n");
+
+	rdev->tq = taskqueue_create("radeonkms", M_WAITOK,
+	    taskqueue_thread_enqueue, &rdev->tq);
 
 #ifdef DUMBBELL_WIP
 	/* if we have > 1 VGA cards, then disable the radeon VGA resources */
@@ -1209,14 +1188,18 @@ void radeon_device_fini(struct radeon_device *rdev)
 	DRM_INFO("radeon: finishing device.\n");
 	rdev->shutdown = true;
 	/* evict vram memory */
-#ifdef DUMBBELL_WIP
 	radeon_bo_evict_vram(rdev);
-#endif /* DUMBBELL_WIP */
 	radeon_fini(rdev);
 #ifdef DUMBBELL_WIP
 	vga_switcheroo_unregister_client(rdev->pdev);
 	vga_client_register(rdev->pdev, NULL, NULL, NULL);
 #endif /* DUMBBELL_WIP */
+
+	if (rdev->tq != NULL) {
+		taskqueue_free(rdev->tq);
+		rdev->tq = NULL;
+	}
+
 	if (rdev->rio_mem)
 		bus_release_resource(rdev->dev, SYS_RES_IOPORT, rdev->rio_rid,
 		    rdev->rio_mem);
@@ -1243,8 +1226,7 @@ void radeon_device_fini(struct radeon_device *rdev)
  * Returns 0 for success or an error on failure.
  * Called at driver suspend.
  */
-#ifdef DUMBBELL_WIP
-int radeon_suspend_kms(struct drm_device *dev, pm_message_t state)
+int radeon_suspend_kms(struct drm_device *dev)
 {
 	struct radeon_device *rdev;
 	struct drm_crtc *crtc;
@@ -1255,9 +1237,11 @@ int radeon_suspend_kms(struct drm_device *dev, pm_message_t state)
 	if (dev == NULL || dev->dev_private == NULL) {
 		return -ENODEV;
 	}
+#ifdef DUMBBELL_WIP
 	if (state.event == PM_EVENT_PRETHAW) {
 		return 0;
 	}
+#endif /* DUMBBELL_WIP */
 	rdev = dev->dev_private;
 
 	if (dev->switch_power_state == DRM_SWITCH_POWER_OFF)
@@ -1291,7 +1275,7 @@ int radeon_suspend_kms(struct drm_device *dev, pm_message_t state)
 	/* evict vram memory */
 	radeon_bo_evict_vram(rdev);
 
-	mutex_lock(&rdev->ring_lock);
+	sx_xlock(&rdev->ring_lock);
 	/* wait for gpu to finish processing current batch */
 	for (i = 0; i < RADEON_NUM_RINGS; i++) {
 		r = radeon_fence_wait_empty_locked(rdev, i);
@@ -1303,7 +1287,7 @@ int radeon_suspend_kms(struct drm_device *dev, pm_message_t state)
 	if (force_completion) {
 		radeon_fence_driver_force_completion(rdev);
 	}
-	mutex_unlock(&rdev->ring_lock);
+	sx_xunlock(&rdev->ring_lock);
 
 	radeon_save_bios_scratch_regs(rdev);
 
@@ -1315,18 +1299,23 @@ int radeon_suspend_kms(struct drm_device *dev, pm_message_t state)
 
 	radeon_agp_suspend(rdev);
 
-	pci_save_state(dev->pdev);
+	pci_save_state(dev->device);
+#ifdef DUMBBELL_WIP
 	if (state.event == PM_EVENT_SUSPEND) {
 		/* Shut down the device */
 		pci_disable_device(dev->pdev);
-		pci_set_power_state(dev->pdev, PCI_D3hot);
+#endif /* DUMBBELL_WIP */
+		pci_set_powerstate(dev->device, PCI_POWERSTATE_D3);
+#ifdef DUMBBELL_WIP
 	}
 	console_lock();
+#endif /* DUMBBELL_WIP */
 	radeon_fbdev_set_suspend(rdev, 1);
+#ifdef DUMBBELL_WIP
 	console_unlock();
+#endif /* DUMBBELL_WIP */
 	return 0;
 }
-#endif /* DUMBBELL_WIP */
 
 /**
  * radeon_resume_kms - initiate device resume
@@ -1337,7 +1326,6 @@ int radeon_suspend_kms(struct drm_device *dev, pm_message_t state)
  * Returns 0 for success or an error on failure.
  * Called at driver resume.
  */
-#ifdef DUMBBELL_WIP
 int radeon_resume_kms(struct drm_device *dev)
 {
 	struct drm_connector *connector;
@@ -1347,13 +1335,17 @@ int radeon_resume_kms(struct drm_device *dev)
 	if (dev->switch_power_state == DRM_SWITCH_POWER_OFF)
 		return 0;
 
+#ifdef DUMBBELL_WIP
 	console_lock();
-	pci_set_power_state(dev->pdev, PCI_D0);
-	pci_restore_state(dev->pdev);
+#endif /* DUMBBELL_WIP */
+	pci_set_powerstate(dev->device, PCI_POWERSTATE_D0);
+	pci_restore_state(dev->device);
+#ifdef DUMBBELL_WIP
 	if (pci_enable_device(dev->pdev)) {
 		console_unlock();
 		return -1;
 	}
+#endif /* DUMBBELL_WIP */
 	/* resume AGP if in use */
 	radeon_agp_resume(rdev);
 	radeon_resume(rdev);
@@ -1366,7 +1358,9 @@ int radeon_resume_kms(struct drm_device *dev)
 	radeon_restore_bios_scratch_regs(rdev);
 
 	radeon_fbdev_set_suspend(rdev, 0);
+#ifdef DUMBBELL_WIP
 	console_unlock();
+#endif /* DUMBBELL_WIP */
 
 	/* init dig PHYs, disp eng pll */
 	if (rdev->is_atom_bios) {
@@ -1392,7 +1386,6 @@ int radeon_resume_kms(struct drm_device *dev)
 	drm_kms_helper_poll_enable(dev);
 	return 0;
 }
-#endif /* DUMBBELL_WIP */
 
 /**
  * radeon_gpu_reset - reset the asic
@@ -1402,7 +1395,6 @@ int radeon_resume_kms(struct drm_device *dev)
  * Attempt the reset the GPU if it has hung (all asics).
  * Returns 0 for success or an error on failure.
  */
-#ifdef DUMBBELL_WIP
 int radeon_gpu_reset(struct radeon_device *rdev)
 {
 	unsigned ring_sizes[RADEON_NUM_RINGS];
@@ -1413,7 +1405,7 @@ int radeon_gpu_reset(struct radeon_device *rdev)
 	int i, r;
 	int resched;
 
-	down_write(&rdev->exclusive_lock);
+	rw_wlock(&rdev->exclusive_lock);
 	radeon_save_bios_scratch_regs(rdev);
 	/* block TTM */
 	resched = ttm_bo_lock_delayed_workqueue(&rdev->mman.bdev);
@@ -1458,7 +1450,7 @@ retry:
 	} else {
 		radeon_fence_driver_force_completion(rdev);
 		for (i = 0; i < RADEON_NUM_RINGS; ++i) {
-			kfree(ring_data[i]);
+			free(ring_data[i], DRM_MEM_DRIVER);
 		}
 	}
 
@@ -1470,10 +1462,9 @@ retry:
 		dev_info(rdev->dev, "GPU reset failed\n");
 	}
 
-	up_write(&rdev->exclusive_lock);
+	rw_wunlock(&rdev->exclusive_lock);
 	return r;
 }
-#endif /* DUMBBELL_WIP */
 
 
 /*

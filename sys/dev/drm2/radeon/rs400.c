@@ -25,9 +25,11 @@
  *          Alex Deucher
  *          Jerome Glisse
  */
-#include <linux/seq_file.h>
-#include <linux/slab.h>
-#include <drm/drmP.h>
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
 #include "radeon.h"
 #include "radeon_asic.h"
 #include "rs400d.h"
@@ -78,7 +80,7 @@ int rs400_gart_init(struct radeon_device *rdev)
 	int r;
 
 	if (rdev->gart.ptr) {
-		WARN(1, "RS400 GART already initialized\n");
+		DRM_ERROR("RS400 GART already initialized\n");
 		return 0;
 	}
 	/* Check gart size */
@@ -247,7 +249,7 @@ static void rs400_gpu_init(struct radeon_device *rdev)
 	/* FIXME: is this correct ? */
 	r420_pipes_init(rdev);
 	if (rs400_mc_wait_for_idle(rdev)) {
-		printk(KERN_WARNING "rs400: Failed to wait MC idle while "
+		DRM_ERROR("rs400: Failed to wait MC idle while "
 		       "programming pipes. Bad things might happen. %08x\n", RREG32(RADEON_MC_STATUS));
 	}
 }
@@ -486,7 +488,7 @@ void rs400_fini(struct radeon_device *rdev)
 	radeon_fence_driver_fini(rdev);
 	radeon_bo_fini(rdev);
 	radeon_atombios_fini(rdev);
-	kfree(rdev->bios);
+	free(rdev->bios, DRM_MEM_DRIVER);
 	rdev->bios = NULL;
 }
 

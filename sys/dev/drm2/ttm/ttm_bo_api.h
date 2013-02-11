@@ -32,7 +32,6 @@
 #define _TTM_BO_API_H_
 
 #include <dev/drm2/drmP.h>
-#include <ofed/include/linux/rbtree.h>
 
 struct ttm_bo_device;
 
@@ -252,7 +251,7 @@ struct ttm_buffer_object {
 	 * Members protected by the bdev::vm_lock
 	 */
 
-	struct rb_node vm_rb;
+	RB_ENTRY(ttm_buffer_object) vm_rb;
 	struct drm_mm_node *vm_node;
 
 

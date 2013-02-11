@@ -23,8 +23,12 @@
  * Authors:
  *     Alex Deucher <alexander.deucher@amd.com>
  */
-#include <drm/drmP.h>
-#include <drm/radeon_drm.h>
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 #include "radeon_drv.h"
 
 #include "r600_blit_shaders.h"
@@ -48,7 +52,7 @@ set_render_target(drm_radeon_private_t *dev_priv, int format, int w, int h, u64 
 	RING_LOCALS;
 	DRM_DEBUG("\n");
 
-	h = ALIGN(h, 8);
+	h = roundup2(h, 8);
 	if (h < 8)
 		h = 8;
 
@@ -191,7 +195,7 @@ set_vtx_resource(drm_radeon_private_t *dev_priv, u64 gpu_addr)
 	DRM_DEBUG("\n");
 
 	sq_vtx_constant_word2 = (((gpu_addr >> 32) & 0xff) | (16 << 8));
-#ifdef __BIG_ENDIAN
+#if _BYTE_ORDER == _BIG_ENDIAN
 	sq_vtx_constant_word2 |= (2 << 30);
 #endif
 
@@ -293,7 +297,7 @@ draw_auto(drm_radeon_private_t *dev_priv)
 	OUT_RING(DI_PT_RECTLIST);
 
 	OUT_RING(CP_PACKET3(R600_IT_INDEX_TYPE, 0));
-#ifdef __BIG_ENDIAN
+#if _BYTE_ORDER == _BIG_ENDIAN
 	OUT_RING((2 << 2) | DI_INDEX_SIZE_16_BIT);
 #else
 	OUT_RING(DI_INDEX_SIZE_16_BIT);
@@ -506,7 +510,7 @@ __pure uint32_t int2float(uint32_t x)
 	if (!x) return 0;
 
 	/* Get location of the most significant bit */
-	msb = __fls(x);
+	msb = fls(x);
 
 	/*
 	 * Use a rotate instead of a shift because that works both leftwards
@@ -535,7 +539,7 @@ static void r600_nomm_put_vb(struct drm_device *dev)
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 
 	dev_priv->blit_vb->used = 0;
-	radeon_cp_discard_buffer(dev, dev_priv->blit_vb->file_priv->master, dev_priv->blit_vb);
+	radeon_cp_discard_buffer(dev, dev_priv->blit_vb->file_priv->masterp, dev_priv->blit_vb);
 }
 
 static void *r600_nomm_get_vb_ptr(struct drm_device *dev)

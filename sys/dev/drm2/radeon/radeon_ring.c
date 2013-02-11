@@ -47,6 +47,7 @@ __FBSDID("$FreeBSD$");
  * put in IBs for execution by the requested ring.
  */
 static int radeon_debugfs_sa_init(struct radeon_device *rdev);
+#endif /* DUMBBELL_WIP */
 
 /**
  * radeon_ib_get - request an IB (Indirect Buffer)
@@ -218,9 +219,11 @@ int radeon_ib_pool_init(struct radeon_device *rdev)
 	}
 
 	rdev->ib_pool_ready = true;
+#ifdef DUMBBELL_WIP
 	if (radeon_debugfs_sa_init(rdev)) {
 		dev_err(rdev->dev, "failed to register debugfs file for SA\n");
 	}
+#endif /* DUMBBELL_WIP */
 	return 0;
 }
 
@@ -240,7 +243,6 @@ void radeon_ib_pool_fini(struct radeon_device *rdev)
 		rdev->ib_pool_ready = false;
 	}
 }
-#endif /* DUMBBELL_WIP */
 
 /**
  * radeon_ib_ring_tests - test IBs on the rings
@@ -297,7 +299,9 @@ int radeon_ib_ring_tests(struct radeon_device *rdev)
  * them until the pointers are equal again.
  */
 static int radeon_debugfs_ring_init(struct radeon_device *rdev, struct radeon_ring *ring);
+#endif /* DUMBBELL_WIP */
 
+#ifdef DUMBBELL_WIP
 /**
  * radeon_ring_write - write a value to the ring
  *
@@ -318,6 +322,7 @@ void radeon_ring_write(struct radeon_ring *ring, uint32_t v)
 	ring->count_dw--;
 	ring->ring_free_dw--;
 }
+#endif /* DUMBBELL_WIP */
 
 /**
  * radeon_ring_supports_scratch_reg - check if the ring supports
@@ -414,10 +419,10 @@ int radeon_ring_lock(struct radeon_device *rdev, struct radeon_ring *ring, unsig
 {
 	int r;
 
-	mutex_lock(&rdev->ring_lock);
+	sx_xlock(&rdev->ring_lock);
 	r = radeon_ring_alloc(rdev, ring, ndw);
 	if (r) {
-		mutex_unlock(&rdev->ring_lock);
+		sx_xunlock(&rdev->ring_lock);
 		return r;
 	}
 	return 0;
@@ -456,7 +461,7 @@ void radeon_ring_commit(struct radeon_device *rdev, struct radeon_ring *ring)
 void radeon_ring_unlock_commit(struct radeon_device *rdev, struct radeon_ring *ring)
 {
 	radeon_ring_commit(rdev, ring);
-	mutex_unlock(&rdev->ring_lock);
+	sx_xunlock(&rdev->ring_lock);
 }
 
 /**
@@ -481,7 +486,7 @@ void radeon_ring_undo(struct radeon_ring *ring)
 void radeon_ring_unlock_undo(struct radeon_device *rdev, struct radeon_ring *ring)
 {
 	radeon_ring_undo(ring);
-	mutex_unlock(&rdev->ring_lock);
+	sx_xunlock(&rdev->ring_lock);
 }
 
 /**
@@ -581,17 +586,17 @@ unsigned radeon_ring_backup(struct radeon_device *rdev, struct radeon_ring *ring
 	unsigned size, ptr, i;
 
 	/* just in case lock the ring */
-	mutex_lock(&rdev->ring_lock);
+	sx_xlock(&rdev->ring_lock);
 	*data = NULL;
 
 	if (ring->ring_obj == NULL) {
-		mutex_unlock(&rdev->ring_lock);
+		sx_xunlock(&rdev->ring_lock);
 		return 0;
 	}
 
 	/* it doesn't make sense to save anything if all fences are signaled */
 	if (!radeon_fence_count_emitted(rdev, ring->idx)) {
-		mutex_unlock(&rdev->ring_lock);
+		sx_xunlock(&rdev->ring_lock);
 		return 0;
 	}
 
@@ -602,7 +607,7 @@ unsigned radeon_ring_backup(struct radeon_device *rdev, struct radeon_ring *ring
 		ptr = le32_to_cpu(*ring->next_rptr_cpu_addr);
 	else {
 		/* no way to read back the next rptr */
-		mutex_unlock(&rdev->ring_lock);
+		sx_xunlock(&rdev->ring_lock);
 		return 0;
 	}
 
@@ -610,14 +615,14 @@ unsigned radeon_ring_backup(struct radeon_device *rdev, struct radeon_ring *ring
 	size -= ptr;
 	size &= ring->ptr_mask;
 	if (size == 0) {
-		mutex_unlock(&rdev->ring_lock);
+		sx_xunlock(&rdev->ring_lock);
 		return 0;
 	}
 
 	/* and then save the content of the ring */
-	*data = kmalloc_array(size, sizeof(uint32_t), GFP_KERNEL);
+	*data = malloc(size * sizeof(uint32_t), DRM_MEM_DRIVER, M_WAITOK);
 	if (!*data) {
-		mutex_unlock(&rdev->ring_lock);
+		sx_xunlock(&rdev->ring_lock);
 		return 0;
 	}
 	for (i = 0; i < size; ++i) {
@@ -625,7 +630,7 @@ unsigned radeon_ring_backup(struct radeon_device *rdev, struct radeon_ring *ring
 		ptr &= ring->ptr_mask;
 	}
 
-	mutex_unlock(&rdev->ring_lock);
+	sx_xunlock(&rdev->ring_lock);
 	return size;
 }
 
@@ -657,7 +662,7 @@ int radeon_ring_restore(struct radeon_device *rdev, struct radeon_ring *ring,
 	}
 
 	radeon_ring_unlock_commit(rdev, ring);
-	kfree(data);
+	free(data, DRM_MEM_DRIVER);
 	return 0;
 }
 
@@ -724,9 +729,11 @@ int radeon_ring_init(struct radeon_device *rdev, struct radeon_ring *ring, unsig
 		ring->next_rptr_gpu_addr = rdev->wb.gpu_addr + index;
 		ring->next_rptr_cpu_addr = &rdev->wb.wb[index/4];
 	}
+#ifdef DUMBBELL_WIP
 	if (radeon_debugfs_ring_init(rdev, ring)) {
 		DRM_ERROR("Failed to register debugfs file for rings !\n");
 	}
+#endif /* DUMBBELL_WIP */
 	radeon_ring_lockup_update(ring);
 	return 0;
 }
@@ -744,12 +751,12 @@ void radeon_ring_fini(struct radeon_device *rdev, struct radeon_ring *ring)
 	int r;
 	struct radeon_bo *ring_obj;
 
-	mutex_lock(&rdev->ring_lock);
+	sx_xlock(&rdev->ring_lock);
 	ring_obj = ring->ring_obj;
 	ring->ready = false;
 	ring->ring = NULL;
 	ring->ring_obj = NULL;
-	mutex_unlock(&rdev->ring_lock);
+	sx_xunlock(&rdev->ring_lock);
 
 	if (ring_obj) {
 		r = radeon_bo_reserve(ring_obj, false);
@@ -834,6 +841,7 @@ static struct drm_info_list radeon_debugfs_sa_list[] = {
 
 #endif
 
+#ifdef DUMBBELL_WIP
 static int radeon_debugfs_ring_init(struct radeon_device *rdev, struct radeon_ring *ring)
 {
 #if defined(CONFIG_DEBUG_FS)

@@ -29,8 +29,11 @@
  *    Keith Whitwell <keith@tungstengraphics.com>
  */
 
-#include <drm/drmP.h>
-#include <drm/radeon_drm.h>
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 #include "radeon_drv.h"
 
 /* Very simple allocator for GART memory, working on a static range
@@ -42,8 +45,8 @@ static struct mem_block *split_block(struct mem_block *p, int start, int size,
 {
 	/* Maybe cut off the start of an existing block */
 	if (start > p->start) {
-		struct mem_block *newblock = kmalloc(sizeof(*newblock),
-						     GFP_KERNEL);
+		struct mem_block *newblock = malloc(sizeof(*newblock),
+						     DRM_MEM_DRIVER, M_WAITOK);
 		if (!newblock)
 			goto out;
 		newblock->start = start;
@@ -59,8 +62,8 @@ static struct mem_block *split_block(struct mem_block *p, int start, int size,
 
 	/* Maybe cut off the end of an existing block */
 	if (size < p->size) {
-		struct mem_block *newblock = kmalloc(sizeof(*newblock),
-						     GFP_KERNEL);
+		struct mem_block *newblock = malloc(sizeof(*newblock),
+						     DRM_MEM_DRIVER, M_WAITOK);
 		if (!newblock)
 			goto out;
 		newblock->start = start + size;
@@ -117,7 +120,7 @@ static void free_block(struct mem_block *p)
 		p->size += q->size;
 		p->next = q->next;
 		p->next->prev = p;
-		kfree(q);
+		free(q, DRM_MEM_DRIVER);
 	}
 
 	if (p->prev->file_priv == NULL) {
@@ -125,7 +128,7 @@ static void free_block(struct mem_block *p)
 		q->size += p->size;
 		q->next = p->next;
 		q->next->prev = q;
-		kfree(p);
+		free(p, DRM_MEM_DRIVER);
 	}
 }
 
@@ -133,14 +136,15 @@ static void free_block(struct mem_block *p)
  */
 static int init_heap(struct mem_block **heap, int start, int size)
 {
-	struct mem_block *blocks = kmalloc(sizeof(*blocks), GFP_KERNEL);
+	struct mem_block *blocks = malloc(sizeof(*blocks),
+	    DRM_MEM_DRIVER, M_WAITOK);
 
 	if (!blocks)
 		return -ENOMEM;
 
-	*heap = kzalloc(sizeof(**heap), GFP_KERNEL);
+	*heap = malloc(sizeof(**heap), DRM_MEM_DRIVER, M_ZERO | M_WAITOK);
 	if (!*heap) {
-		kfree(blocks);
+		free(blocks, DRM_MEM_DRIVER);
 		return -ENOMEM;
 	}
 
@@ -177,7 +181,7 @@ void radeon_mem_release(struct drm_file *file_priv, struct mem_block *heap)
 			p->size += q->size;
 			p->next = q->next;
 			p->next->prev = p;
-			kfree(q);
+			free(q, DRM_MEM_DRIVER);
 		}
 	}
 }
@@ -194,10 +198,10 @@ void radeon_mem_takedown(struct mem_block **heap)
 	for (p = (*heap)->next; p != *heap;) {
 		struct mem_block *q = p;
 		p = p->next;
-		kfree(q);
+		free(q, DRM_MEM_DRIVER);
 	}
 
-	kfree(*heap);
+	free(*heap, DRM_MEM_DRIVER);
 	*heap = NULL;
 }
 

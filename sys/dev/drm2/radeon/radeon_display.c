@@ -246,14 +246,12 @@ static void radeon_crtc_destroy(struct drm_crtc *crtc)
 	free(radeon_crtc, DRM_MEM_DRIVER);
 }
 
-#ifdef DUMBBELL_WIP
 /*
  * Handle unpin events outside the interrupt handler proper.
  */
-static void radeon_unpin_work_func(struct work_struct *__work)
+static void radeon_unpin_work_func(void *arg, int pending)
 {
-	struct radeon_unpin_work *work =
-		container_of(__work, struct radeon_unpin_work, work);
+	struct radeon_unpin_work *work = arg;
 	int r;
 
 	/* unpin of the old buffer */
@@ -268,7 +266,7 @@ static void radeon_unpin_work_func(struct work_struct *__work)
 		DRM_ERROR("failed to reserve buffer after flip\n");
 
 	drm_gem_object_unreference_unlocked(&work->old_rbo->gem_base);
-	kfree(work);
+	free(work, DRM_MEM_DRIVER);
 }
 
 void radeon_crtc_handle_flip(struct radeon_device *rdev, int crtc_id)
@@ -281,11 +279,11 @@ void radeon_crtc_handle_flip(struct radeon_device *rdev, int crtc_id)
 	u32 update_pending;
 	int vpos, hpos;
 
-	spin_lock_irqsave(&rdev->ddev->event_lock, flags);
+	DRM_SPINLOCK_IRQSAVE(&rdev->ddev->event_lock, flags);
 	work = radeon_crtc->unpin_work;
 	if (work == NULL ||
 	    (work->fence && !radeon_fence_signaled(work->fence))) {
-		spin_unlock_irqrestore(&rdev->ddev->event_lock, flags);
+		DRM_SPINUNLOCK_IRQRESTORE(&rdev->ddev->event_lock, flags);
 		return;
 	}
 	/* New pageflip, or just completion of a previous one? */
@@ -324,7 +322,7 @@ void radeon_crtc_handle_flip(struct radeon_device *rdev, int crtc_id)
 		 * next vblank irq.
 		 */
 		radeon_crtc->deferred_flip_completion = 1;
-		spin_unlock_irqrestore(&rdev->ddev->event_lock, flags);
+		DRM_SPINUNLOCK_IRQRESTORE(&rdev->ddev->event_lock, flags);
 		return;
 	}
 
@@ -338,23 +336,23 @@ void radeon_crtc_handle_flip(struct radeon_device *rdev, int crtc_id)
 		e->event.tv_sec = now.tv_sec;
 		e->event.tv_usec = now.tv_usec;
 		list_add_tail(&e->base.link, &e->base.file_priv->event_list);
+#ifdef DUMBBELL_WIP
 		wake_up_interruptible(&e->base.file_priv->event_wait);
+#endif /* DUMBBELL_WIP */
 	}
-	spin_unlock_irqrestore(&rdev->ddev->event_lock, flags);
+	DRM_SPINUNLOCK_IRQRESTORE(&rdev->ddev->event_lock, flags);
 
 	drm_vblank_put(rdev->ddev, radeon_crtc->crtc_id);
 	radeon_fence_unref(&work->fence);
 	radeon_post_page_flip(work->rdev, work->crtc_id);
-	schedule_work(&work->work);
+	taskqueue_enqueue(rdev->tq, &work->work);
 }
-#endif /* DUMBBELL_WIP */
 
 static int radeon_crtc_page_flip(struct drm_crtc *crtc,
 				 struct drm_framebuffer *fb,
 				 struct drm_pending_vblank_event *event)
 {
 	return 0;
-#ifdef DUMBBELL_WIP
 	struct drm_device *dev = crtc->dev;
 	struct radeon_device *rdev = dev->dev_private;
 	struct radeon_crtc *radeon_crtc = to_radeon_crtc(crtc);
@@ -386,15 +384,15 @@ static int radeon_crtc_page_flip(struct drm_crtc *crtc,
 	obj = new_radeon_fb->obj;
 	rbo = gem_to_radeon_bo(obj);
 
-	spin_lock(&rbo->tbo.bdev->fence_lock);
+	DRM_SPINLOCK(&rbo->tbo.bdev->fence_lock);
 	if (rbo->tbo.sync_obj)
 		work->fence = radeon_fence_ref(rbo->tbo.sync_obj);
-	spin_unlock(&rbo->tbo.bdev->fence_lock);
+	DRM_SPINUNLOCK(&rbo->tbo.bdev->fence_lock);
 
-	INIT_WORK(&work->work, radeon_unpin_work_func);
+	TASK_INIT(&work->work, 0, radeon_unpin_work_func, work);
 
 	/* We borrow the event spin lock for protecting unpin_work */
-	spin_lock_irqsave(&dev->event_lock, flags);
+	DRM_SPINLOCK_IRQSAVE(&dev->event_lock, flags);
 	if (radeon_crtc->unpin_work) {
 		DRM_DEBUG_DRIVER("flip queue: crtc already busy\n");
 		r = -EBUSY;
@@ -402,7 +400,7 @@ static int radeon_crtc_page_flip(struct drm_crtc *crtc,
 	}
 	radeon_crtc->unpin_work = work;
 	radeon_crtc->deferred_flip_completion = 0;
-	spin_unlock_irqrestore(&dev->event_lock, flags);
+	DRM_SPINUNLOCK_IRQRESTORE(&dev->event_lock, flags);
 
 	/* pin the new buffer */
 	DRM_DEBUG_DRIVER("flip-ioctl() cur_fbo = %p, cur_bbo = %p\n",
@@ -461,9 +459,9 @@ static int radeon_crtc_page_flip(struct drm_crtc *crtc,
 		base &= ~7;
 	}
 
-	spin_lock_irqsave(&dev->event_lock, flags);
+	DRM_SPINLOCK_IRQSAVE(&dev->event_lock, flags);
 	work->new_crtc_base = base;
-	spin_unlock_irqrestore(&dev->event_lock, flags);
+	DRM_SPINUNLOCK_IRQRESTORE(&dev->event_lock, flags);
 
 	/* update crtc fb */
 	crtc->fb = fb;
@@ -490,16 +488,15 @@ pflip_cleanup1:
 	radeon_bo_unreserve(rbo);
 
 pflip_cleanup:
-	spin_lock_irqsave(&dev->event_lock, flags);
+	DRM_SPINLOCK_IRQSAVE(&dev->event_lock, flags);
 	radeon_crtc->unpin_work = NULL;
 unlock_free:
-	spin_unlock_irqrestore(&dev->event_lock, flags);
+	DRM_SPINUNLOCK_IRQRESTORE(&dev->event_lock, flags);
 	drm_gem_object_unreference_unlocked(old_radeon_fb->obj);
 	radeon_fence_unref(&work->fence);
-	kfree(work);
+	free(work, DRM_MEM_DRIVER);
 
 	return r;
-#endif /* DUMBBELL_WIP */
 }
 
 static const struct drm_crtc_funcs radeon_crtc_funcs = {
@@ -697,7 +694,6 @@ static bool radeon_setup_enc_conn(struct drm_device *dev)
 	return ret;
 }
 
-#ifdef DUMBBELL_WIP
 int radeon_ddc_get_modes(struct radeon_connector *radeon_connector)
 {
 	struct drm_device *dev = radeon_connector->base.dev;
@@ -714,7 +710,7 @@ int radeon_ddc_get_modes(struct radeon_connector *radeon_connector)
 
 		if (dig->dp_i2c_bus)
 			radeon_connector->edid = drm_get_edid(&radeon_connector->base,
-							      &dig->dp_i2c_bus->adapter);
+							      dig->dp_i2c_bus->adapter);
 	} else if ((radeon_connector->base.connector_type == DRM_MODE_CONNECTOR_DisplayPort) ||
 		   (radeon_connector->base.connector_type == DRM_MODE_CONNECTOR_eDP)) {
 		struct radeon_connector_atom_dig *dig = radeon_connector->con_priv;
@@ -722,14 +718,14 @@ int radeon_ddc_get_modes(struct radeon_connector *radeon_connector)
 		if ((dig->dp_sink_type == CONNECTOR_OBJECT_ID_DISPLAYPORT ||
 		     dig->dp_sink_type == CONNECTOR_OBJECT_ID_eDP) && dig->dp_i2c_bus)
 			radeon_connector->edid = drm_get_edid(&radeon_connector->base,
-							      &dig->dp_i2c_bus->adapter);
+							      dig->dp_i2c_bus->adapter);
 		else if (radeon_connector->ddc_bus && !radeon_connector->edid)
 			radeon_connector->edid = drm_get_edid(&radeon_connector->base,
-							      &radeon_connector->ddc_bus->adapter);
+							      radeon_connector->ddc_bus->adapter);
 	} else {
 		if (radeon_connector->ddc_bus && !radeon_connector->edid)
 			radeon_connector->edid = drm_get_edid(&radeon_connector->base,
-							      &radeon_connector->ddc_bus->adapter);
+							      radeon_connector->ddc_bus->adapter);
 	}
 
 	if (!radeon_connector->edid) {
@@ -905,7 +901,7 @@ void radeon_compute_pll_legacy(struct radeon_pll *pll,
 	uint32_t post_div;
 	u32 pll_out_min, pll_out_max;
 
-	DRM_DEBUG_KMS("PLL freq %llu %u %u\n", freq, pll->min_ref_div, pll->max_ref_div);
+	DRM_DEBUG_KMS("PLL freq %lu %u %u\n", freq, pll->min_ref_div, pll->max_ref_div);
 	freq = freq * 1000;
 
 	if (pll->flags & RADEON_PLL_IS_LCD) {
@@ -1073,7 +1069,7 @@ static void radeon_user_framebuffer_destroy(struct drm_framebuffer *fb)
 		drm_gem_object_unreference_unlocked(radeon_fb->obj);
 	}
 	drm_framebuffer_cleanup(fb);
-	kfree(radeon_fb);
+	free(radeon_fb, DRM_MEM_DRIVER);
 }
 
 static int radeon_user_framebuffer_create_handle(struct drm_framebuffer *fb,
@@ -1106,7 +1102,6 @@ radeon_framebuffer_init(struct drm_device *dev,
 	drm_helper_mode_fill_fb_struct(&rfb->base, mode_cmd);
 	return 0;
 }
-#endif /* DUMBBELL_WIP */
 
 static int
 radeon_user_framebuffer_create(struct drm_device *dev,
@@ -1432,7 +1427,6 @@ void radeon_modeset_fini(struct radeon_device *rdev)
 	radeon_i2c_fini(rdev);
 }
 
-#ifdef DUMBBELL_WIP
 static bool is_hdtv_mode(const struct drm_display_mode *mode)
 {
 	/* try and guess if this is a tv or a monitor */
@@ -1692,4 +1686,3 @@ int radeon_get_crtc_scanoutpos(struct drm_device *dev, int crtc, int *vpos, int 
 
 	return ret;
 }
-#endif /* DUMBBELL_WIP */

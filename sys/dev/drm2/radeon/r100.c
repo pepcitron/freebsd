@@ -25,10 +25,12 @@
  *          Alex Deucher
  *          Jerome Glisse
  */
-#include <linux/seq_file.h>
-#include <linux/slab.h>
-#include <drm/drmP.h>
-#include <drm/radeon_drm.h>
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 #include "radeon_reg.h"
 #include "radeon.h"
 #include "radeon_asic.h"
@@ -38,22 +40,19 @@
 #include "rv250d.h"
 #include "atom.h"
 
-#include <linux/firmware.h>
-#include <linux/platform_device.h>
-#include <linux/module.h>
-
 #include "r100_reg_safe.h"
 #include "rn50_reg_safe.h"
 
 /* Firmware Names */
-#define FIRMWARE_R100		"radeon/R100_cp.bin"
-#define FIRMWARE_R200		"radeon/R200_cp.bin"
-#define FIRMWARE_R300		"radeon/R300_cp.bin"
-#define FIRMWARE_R420		"radeon/R420_cp.bin"
-#define FIRMWARE_RS690		"radeon/RS690_cp.bin"
-#define FIRMWARE_RS600		"radeon/RS600_cp.bin"
-#define FIRMWARE_R520		"radeon/R520_cp.bin"
+#define FIRMWARE_R100		"radeon_R100_cp"
+#define FIRMWARE_R200		"radeon_R200_cp"
+#define FIRMWARE_R300		"radeon_R300_cp"
+#define FIRMWARE_R420		"radeon_R420_cp"
+#define FIRMWARE_RS690		"radeon_RS690_cp"
+#define FIRMWARE_RS600		"radeon_RS600_cp"
+#define FIRMWARE_R520		"radeon_R520_cp"
 
+#ifdef DUMBBELL_WIP
 MODULE_FIRMWARE(FIRMWARE_R100);
 MODULE_FIRMWARE(FIRMWARE_R200);
 MODULE_FIRMWARE(FIRMWARE_R300);
@@ -61,6 +60,7 @@ MODULE_FIRMWARE(FIRMWARE_R420);
 MODULE_FIRMWARE(FIRMWARE_RS690);
 MODULE_FIRMWARE(FIRMWARE_RS600);
 MODULE_FIRMWARE(FIRMWARE_R520);
+#endif /* DUMBBELL_WIP */
 
 #include "r100_track.h"
 
@@ -89,12 +89,12 @@ void r100_wait_for_vblank(struct radeon_device *rdev, int crtc)
 			for (i = 0; i < rdev->usec_timeout; i++) {
 				if (!(RREG32(RADEON_CRTC_STATUS) & RADEON_CRTC_VBLANK_CUR))
 					break;
-				udelay(1);
+				DRM_UDELAY(1);
 			}
 			for (i = 0; i < rdev->usec_timeout; i++) {
 				if (RREG32(RADEON_CRTC_STATUS) & RADEON_CRTC_VBLANK_CUR)
 					break;
-				udelay(1);
+				DRM_UDELAY(1);
 			}
 		}
 	} else {
@@ -102,12 +102,12 @@ void r100_wait_for_vblank(struct radeon_device *rdev, int crtc)
 			for (i = 0; i < rdev->usec_timeout; i++) {
 				if (!(RREG32(RADEON_CRTC2_STATUS) & RADEON_CRTC2_VBLANK_CUR))
 					break;
-				udelay(1);
+				DRM_UDELAY(1);
 			}
 			for (i = 0; i < rdev->usec_timeout; i++) {
 				if (RREG32(RADEON_CRTC2_STATUS) & RADEON_CRTC2_VBLANK_CUR)
 					break;
-				udelay(1);
+				DRM_UDELAY(1);
 			}
 		}
 	}
@@ -170,7 +170,7 @@ u32 r100_page_flip(struct radeon_device *rdev, int crtc_id, u64 crtc_base)
 	for (i = 0; i < rdev->usec_timeout; i++) {
 		if (RREG32(RADEON_CRTC_OFFSET + radeon_crtc->crtc_offset) & RADEON_CRTC_OFFSET__GUI_TRIG_OFFSET)
 			break;
-		udelay(1);
+		DRM_UDELAY(1);
 	}
 	DRM_DEBUG("Update pending now high. Unlocking vupdate_lock.\n");
 
@@ -345,7 +345,7 @@ void r100_pm_misc(struct radeon_device *rdev)
 				tmp &= ~(voltage->gpio.mask);
 			WREG32(voltage->gpio.reg, tmp);
 			if (voltage->delay)
-				udelay(voltage->delay);
+				DRM_UDELAY(voltage->delay);
 		} else {
 			tmp = RREG32(voltage->gpio.reg);
 			if (voltage->active_high)
@@ -354,7 +354,7 @@ void r100_pm_misc(struct radeon_device *rdev)
 				tmp |= voltage->gpio.mask;
 			WREG32(voltage->gpio.reg, tmp);
 			if (voltage->delay)
-				udelay(voltage->delay);
+				DRM_UDELAY(voltage->delay);
 		}
 	}
 
@@ -622,7 +622,7 @@ int r100_pci_gart_init(struct radeon_device *rdev)
 	int r;
 
 	if (rdev->gart.ptr) {
-		WARN(1, "R100 PCI GART already initialized\n");
+		DRM_ERROR("R100 PCI GART already initialized\n");
 		return 0;
 	}
 	/* Initialize common gart structure */
@@ -692,7 +692,7 @@ int r100_irq_set(struct radeon_device *rdev)
 	uint32_t tmp = 0;
 
 	if (!rdev->irq.installed) {
-		WARN(1, "Can't enable IRQ/MSI because no handler is installed\n");
+		DRM_ERROR("Can't enable IRQ/MSI because no handler is installed\n");
 		WREG32(R_000040_GEN_INT_CNTL, 0);
 		return -EINVAL;
 	}
@@ -723,7 +723,7 @@ void r100_irq_disable(struct radeon_device *rdev)
 
 	WREG32(R_000040_GEN_INT_CNTL, 0);
 	/* Wait and acknowledge irq */
-	mdelay(1);
+	DRM_MDELAY(1);
 	tmp = RREG32(R_000044_GEN_INT_STATUS);
 	WREG32(R_000044_GEN_INT_STATUS, tmp);
 }
@@ -741,7 +741,7 @@ static uint32_t r100_irq_ack(struct radeon_device *rdev)
 	return irqs & irq_mask;
 }
 
-int r100_irq_process(struct radeon_device *rdev)
+irqreturn_t r100_irq_process(struct radeon_device *rdev)
 {
 	uint32_t status, msi_rearm;
 	bool queue_hotplug = false;
@@ -763,7 +763,7 @@ int r100_irq_process(struct radeon_device *rdev)
 			if (rdev->irq.crtc_vblank_int[0]) {
 				drm_handle_vblank(rdev->ddev, 0);
 				rdev->pm.vblank_sync = true;
-				wake_up(&rdev->irq.vblank_queue);
+				DRM_WAKEUP(&rdev->irq.vblank_queue);
 			}
 			if (atomic_read(&rdev->irq.pflip[0]))
 				radeon_crtc_handle_flip(rdev, 0);
@@ -772,7 +772,7 @@ int r100_irq_process(struct radeon_device *rdev)
 			if (rdev->irq.crtc_vblank_int[1]) {
 				drm_handle_vblank(rdev->ddev, 1);
 				rdev->pm.vblank_sync = true;
-				wake_up(&rdev->irq.vblank_queue);
+				DRM_WAKEUP(&rdev->irq.vblank_queue);
 			}
 			if (atomic_read(&rdev->irq.pflip[1]))
 				radeon_crtc_handle_flip(rdev, 1);
@@ -788,7 +788,7 @@ int r100_irq_process(struct radeon_device *rdev)
 		status = r100_irq_ack(rdev);
 	}
 	if (queue_hotplug)
-		schedule_work(&rdev->hotplug_work);
+		taskqueue_enqueue(rdev->tq, &rdev->hotplug_work);
 	if (rdev->msi_enabled) {
 		switch (rdev->family) {
 		case CHIP_RS400:
@@ -847,7 +847,7 @@ void r100_semaphore_ring_emit(struct radeon_device *rdev,
 			      bool emit_wait)
 {
 	/* Unused on older asics, since we don't have semaphores or multiple rings */
-	BUG();
+	panic("%s: Unused on older asics", __func__);
 }
 
 int r100_copy_blit(struct radeon_device *rdev,
@@ -934,7 +934,7 @@ static int r100_cp_wait_for_idle(struct radeon_device *rdev)
 		if (!G_000E40_CP_CMDSTRM_BUSY(tmp)) {
 			return 0;
 		}
-		udelay(1);
+		DRM_UDELAY(1);
 	}
 	return -1;
 }
@@ -960,18 +960,11 @@ void r100_ring_start(struct radeon_device *rdev, struct radeon_ring *ring)
 /* Load the microcode for the CP */
 static int r100_cp_init_microcode(struct radeon_device *rdev)
 {
-	struct platform_device *pdev;
 	const char *fw_name = NULL;
 	int err;
 
 	DRM_DEBUG_KMS("\n");
 
-	pdev = platform_device_register_simple("radeon_cp", 0, NULL, 0);
-	err = IS_ERR(pdev);
-	if (err) {
-		printk(KERN_ERR "radeon_cp: Failed to register firmware\n");
-		return -EINVAL;
-	}
 	if ((rdev->family == CHIP_R100) || (rdev->family == CHIP_RV100) ||
 	    (rdev->family == CHIP_RV200) || (rdev->family == CHIP_RS100) ||
 	    (rdev->family == CHIP_RS200)) {
@@ -1013,17 +1006,18 @@ static int r100_cp_init_microcode(struct radeon_device *rdev)
 		fw_name = FIRMWARE_R520;
 	}
 
-	err = request_firmware(&rdev->me_fw, fw_name, &pdev->dev);
-	platform_device_unregister(pdev);
-	if (err) {
-		printk(KERN_ERR "radeon_cp: Failed to load firmware \"%s\"\n",
+	err = 0;
+	rdev->me_fw = firmware_get(fw_name);
+	if (rdev->me_fw == NULL) {
+		DRM_ERROR("radeon_cp: Failed to load firmware \"%s\"\n",
 		       fw_name);
-	} else if (rdev->me_fw->size % 8) {
-		printk(KERN_ERR
+		err = -ENOENT;
+	} else if (rdev->me_fw->datasize % 8) {
+		DRM_ERROR(
 		       "radeon_cp: Bogus length %zu in firmware \"%s\"\n",
-		       rdev->me_fw->size, fw_name);
+		       rdev->me_fw->datasize, fw_name);
 		err = -EINVAL;
-		release_firmware(rdev->me_fw);
+		firmware_put(rdev->me_fw, FIRMWARE_UNLOAD);
 		rdev->me_fw = NULL;
 	}
 	return err;
@@ -1035,13 +1029,13 @@ static void r100_cp_load_microcode(struct radeon_device *rdev)
 	int i, size;
 
 	if (r100_gui_wait_for_idle(rdev)) {
-		printk(KERN_WARNING "Failed to wait GUI idle while "
+		DRM_ERROR("Failed to wait GUI idle while "
 		       "programming pipes. Bad things might happen.\n");
 	}
 
 	if (rdev->me_fw) {
-		size = rdev->me_fw->size / 4;
-		fw_data = (const __be32 *)&rdev->me_fw->data[0];
+		size = rdev->me_fw->datasize / 4;
+		fw_data = (const __be32 *)rdev->me_fw->data;
 		WREG32(RADEON_CP_ME_RAM_ADDR, 0);
 		for (i = 0; i < size; i += 2) {
 			WREG32(RADEON_CP_ME_RAM_DATAH,
@@ -1142,7 +1136,7 @@ int r100_cp_init(struct radeon_device *rdev, unsigned ring_size)
 	}
 
 	WREG32(RADEON_CP_RB_CNTL, tmp);
-	udelay(10);
+	DRM_UDELAY(10);
 	ring->rptr = RREG32(RADEON_CP_RB_RPTR);
 	/* Set cp mode to bus mastering & enable cp*/
 	WREG32(RADEON_CP_CSQ_MODE,
@@ -1153,7 +1147,7 @@ int r100_cp_init(struct radeon_device *rdev, unsigned ring_size)
 	WREG32(RADEON_CP_CSQ_CNTL, RADEON_CSQ_PRIBM_INDBM);
 
 	/* at this point everything should be setup correctly to enable master */
-	pci_set_master(rdev->pdev);
+	pci_enable_busmaster(rdev->dev);
 
 	radeon_ring_start(rdev, RADEON_RING_TYPE_GFX_INDEX, &rdev->ring[RADEON_RING_TYPE_GFX_INDEX]);
 	r = radeon_ring_test(rdev, RADEON_RING_TYPE_GFX_INDEX, ring);
@@ -1196,7 +1190,7 @@ void r100_cp_disable(struct radeon_device *rdev)
 	WREG32(RADEON_CP_CSQ_CNTL, 0);
 	WREG32(R_000770_SCRATCH_UMSK, 0);
 	if (r100_gui_wait_for_idle(rdev)) {
-		printk(KERN_WARNING "Failed to wait GUI idle while "
+		DRM_ERROR("Failed to wait GUI idle while "
 		       "programming pipes. Bad things might happen.\n");
 	}
 }
@@ -1942,7 +1936,7 @@ static int r100_packet0_check(struct radeon_cs_parser *p,
 		track->tex_dirty = true;
 		break;
 	default:
-		printk(KERN_ERR "Forbidden register 0x%04X in cs at %d\n",
+		DRM_ERROR("Forbidden register 0x%04X in cs at %d\n",
 		       reg, idx);
 		return -EINVAL;
 	}
@@ -2094,7 +2088,7 @@ int r100_cs_parse(struct radeon_cs_parser *p)
 	struct r100_cs_track *track;
 	int r;
 
-	track = kzalloc(sizeof(*track), GFP_KERNEL);
+	track = malloc(sizeof(*track), DRM_MEM_DRIVER, M_ZERO | M_WAITOK);
 	if (!track)
 		return -ENOMEM;
 	r100_cs_track_clear(p->rdev, track);
@@ -2548,7 +2542,7 @@ int r100_gui_wait_for_idle(struct radeon_device *rdev)
 	uint32_t tmp;
 
 	if (r100_rbbm_fifo_wait_for_entry(rdev, 64)) {
-		printk(KERN_WARNING "radeon: wait for empty RBBM fifo failed !"
+		DRM_ERROR("radeon: wait for empty RBBM fifo failed !"
 		       " Bad things might happen.\n");
 	}
 	for (i = 0; i < rdev->usec_timeout; i++) {
@@ -2607,14 +2601,14 @@ void r100_bm_disable(struct radeon_device *rdev)
 	/* disable bus mastering */
 	tmp = RREG32(R_000030_BUS_CNTL);
 	WREG32(R_000030_BUS_CNTL, (tmp & 0xFFFFFFFF) | 0x00000044);
-	mdelay(1);
+	DRM_MDELAY(1);
 	WREG32(R_000030_BUS_CNTL, (tmp & 0xFFFFFFFF) | 0x00000042);
-	mdelay(1);
+	DRM_MDELAY(1);
 	WREG32(R_000030_BUS_CNTL, (tmp & 0xFFFFFFFF) | 0x00000040);
 	tmp = RREG32(RADEON_BUS_CNTL);
-	mdelay(1);
-	pci_clear_master(rdev->pdev);
-	mdelay(1);
+	DRM_MDELAY(1);
+	pci_disable_busmaster(rdev->dev);
+	DRM_MDELAY(1);
 }
 
 int r100_asic_reset(struct radeon_device *rdev)
@@ -2638,7 +2632,7 @@ int r100_asic_reset(struct radeon_device *rdev)
 	WREG32(RADEON_CP_RB_WPTR, 0);
 	WREG32(RADEON_CP_RB_CNTL, tmp);
 	/* save PCI state */
-	pci_save_state(rdev->pdev);
+	pci_save_state(rdev->dev);
 	/* disable bus mastering */
 	r100_bm_disable(rdev);
 	WREG32(R_0000F0_RBBM_SOFT_RESET, S_0000F0_SOFT_RESET_SE(1) |
@@ -2646,21 +2640,21 @@ int r100_asic_reset(struct radeon_device *rdev)
 					S_0000F0_SOFT_RESET_PP(1) |
 					S_0000F0_SOFT_RESET_RB(1));
 	RREG32(R_0000F0_RBBM_SOFT_RESET);
-	mdelay(500);
+	DRM_MDELAY(500);
 	WREG32(R_0000F0_RBBM_SOFT_RESET, 0);
-	mdelay(1);
+	DRM_MDELAY(1);
 	status = RREG32(R_000E40_RBBM_STATUS);
 	dev_info(rdev->dev, "(%s:%d) RBBM_STATUS=0x%08X\n", __func__, __LINE__, status);
 	/* reset CP */
 	WREG32(R_0000F0_RBBM_SOFT_RESET, S_0000F0_SOFT_RESET_CP(1));
 	RREG32(R_0000F0_RBBM_SOFT_RESET);
-	mdelay(500);
+	DRM_MDELAY(500);
 	WREG32(R_0000F0_RBBM_SOFT_RESET, 0);
-	mdelay(1);
+	DRM_MDELAY(1);
 	status = RREG32(R_000E40_RBBM_STATUS);
 	dev_info(rdev->dev, "(%s:%d) RBBM_STATUS=0x%08X\n", __func__, __LINE__, status);
 	/* restore PCI & busmastering */
-	pci_restore_state(rdev->pdev);
+	pci_restore_state(rdev->dev);
 	r100_enable_bm(rdev);
 	/* Check if GPU is idle */
 	if (G_000E40_SE_BUSY(status) || G_000E40_RE_BUSY(status) ||
@@ -2693,7 +2687,7 @@ void r100_set_common_regs(struct radeon_device *rdev)
 	 * don't report it in the bios connector
 	 * table.
 	 */
-	switch (dev->pdev->device) {
+	switch (dev->pci_device) {
 		/* RN50 */
 	case 0x515e:
 	case 0x5969:
@@ -2703,17 +2697,17 @@ void r100_set_common_regs(struct radeon_device *rdev)
 	case 0x5159:
 	case 0x515a:
 		/* DELL triple head servers */
-		if ((dev->pdev->subsystem_vendor == 0x1028 /* DELL */) &&
-		    ((dev->pdev->subsystem_device == 0x016c) ||
-		     (dev->pdev->subsystem_device == 0x016d) ||
-		     (dev->pdev->subsystem_device == 0x016e) ||
-		     (dev->pdev->subsystem_device == 0x016f) ||
-		     (dev->pdev->subsystem_device == 0x0170) ||
-		     (dev->pdev->subsystem_device == 0x017d) ||
-		     (dev->pdev->subsystem_device == 0x017e) ||
-		     (dev->pdev->subsystem_device == 0x0183) ||
-		     (dev->pdev->subsystem_device == 0x018a) ||
-		     (dev->pdev->subsystem_device == 0x019a)))
+		if ((dev->pci_subvendor == 0x1028 /* DELL */) &&
+		    ((dev->pci_subdevice == 0x016c) ||
+		     (dev->pci_subdevice == 0x016d) ||
+		     (dev->pci_subdevice == 0x016e) ||
+		     (dev->pci_subdevice == 0x016f) ||
+		     (dev->pci_subdevice == 0x0170) ||
+		     (dev->pci_subdevice == 0x017d) ||
+		     (dev->pci_subdevice == 0x017e) ||
+		     (dev->pci_subdevice == 0x0183) ||
+		     (dev->pci_subdevice == 0x018a) ||
+		     (dev->pci_subdevice == 0x019a)))
 			force_dac2 = true;
 		break;
 	}
@@ -2817,7 +2811,7 @@ static u32 r100_get_accessible_vram(struct radeon_device *rdev)
 	 * check if it's a multifunction card by reading the PCI config
 	 * header type... Limit those to one aperture size
 	 */
-	pci_read_config_byte(rdev->pdev, 0xe, &byte);
+	byte = pci_read_config(rdev->dev, 0xe, 1);
 	if (byte & 0x80) {
 		DRM_INFO("Generation 1 PCI interface in multifunction mode\n");
 		DRM_INFO("Limiting VRAM to one aperture\n");
@@ -2838,8 +2832,8 @@ void r100_vram_init_sizes(struct radeon_device *rdev)
 	u64 config_aper_size;
 
 	/* work out accessible VRAM */
-	rdev->mc.aper_base = pci_resource_start(rdev->pdev, 0);
-	rdev->mc.aper_size = pci_resource_len(rdev->pdev, 0);
+	rdev->mc.aper_base = drm_get_resource_start(rdev->ddev, 0);
+	rdev->mc.aper_size = drm_get_resource_len(rdev->ddev, 0);
 	rdev->mc.visible_vram_size = r100_get_accessible_vram(rdev);
 	/* FIXME we don't use the second aperture yet when we could use it */
 	if (rdev->mc.visible_vram_size > rdev->mc.aper_size)
@@ -2922,7 +2916,7 @@ static void r100_pll_errata_after_data(struct radeon_device *rdev)
 	 * or the chip could hang on a subsequent access
 	 */
 	if (rdev->pll_errata & CHIP_ERRATA_PLL_DELAY) {
-		mdelay(5);
+		DRM_MDELAY(5);
 	}
 
 	/* This function is required to workaround a hardware bug in some (all?)
@@ -2964,10 +2958,10 @@ static void r100_set_safe_registers(struct radeon_device *rdev)
 {
 	if (ASIC_IS_RN50(rdev)) {
 		rdev->config.r100.reg_safe_bm = rn50_reg_safe_bm;
-		rdev->config.r100.reg_safe_bm_size = ARRAY_SIZE(rn50_reg_safe_bm);
+		rdev->config.r100.reg_safe_bm_size = DRM_ARRAY_SIZE(rn50_reg_safe_bm);
 	} else if (rdev->family < CHIP_R200) {
 		rdev->config.r100.reg_safe_bm = r100_reg_safe_bm;
-		rdev->config.r100.reg_safe_bm_size = ARRAY_SIZE(r100_reg_safe_bm);
+		rdev->config.r100.reg_safe_bm_size = DRM_ARRAY_SIZE(r100_reg_safe_bm);
 	} else {
 		r200_set_safe_registers(rdev);
 	}
@@ -4021,7 +4015,7 @@ void r100_fini(struct radeon_device *rdev)
 	radeon_fence_driver_fini(rdev);
 	radeon_bo_fini(rdev);
 	radeon_atombios_fini(rdev);
-	kfree(rdev->bios);
+	free(rdev->bios, DRM_MEM_DRIVER);
 	rdev->bios = NULL;
 }
 
@@ -4139,15 +4133,15 @@ uint32_t r100_mm_rreg(struct radeon_device *rdev, uint32_t reg,
 		      bool always_indirect)
 {
 	if (reg < rdev->rmmio_size && !always_indirect)
-		return readl(((void __iomem *)rdev->rmmio) + reg);
+		return bus_read_4(rdev->rmmio, reg);
 	else {
 		unsigned long flags;
 		uint32_t ret;
 
-		spin_lock_irqsave(&rdev->mmio_idx_lock, flags);
-		writel(reg, ((void __iomem *)rdev->rmmio) + RADEON_MM_INDEX);
-		ret = readl(((void __iomem *)rdev->rmmio) + RADEON_MM_DATA);
-		spin_unlock_irqrestore(&rdev->mmio_idx_lock, flags);
+		DRM_SPINLOCK_IRQSAVE(&rdev->mmio_idx_lock, flags);
+		bus_write_4(rdev->rmmio, RADEON_MM_INDEX, reg);
+		ret = bus_read_4(rdev->rmmio, RADEON_MM_DATA);
+		DRM_SPINUNLOCK_IRQRESTORE(&rdev->mmio_idx_lock, flags);
 
 		return ret;
 	}
@@ -4157,33 +4151,35 @@ void r100_mm_wreg(struct radeon_device *rdev, uint32_t reg, uint32_t v,
 		  bool always_indirect)
 {
 	if (reg < rdev->rmmio_size && !always_indirect)
-		writel(v, ((void __iomem *)rdev->rmmio) + reg);
+		bus_write_4(rdev->rmmio, reg, v);
 	else {
 		unsigned long flags;
 
-		spin_lock_irqsave(&rdev->mmio_idx_lock, flags);
-		writel(reg, ((void __iomem *)rdev->rmmio) + RADEON_MM_INDEX);
-		writel(v, ((void __iomem *)rdev->rmmio) + RADEON_MM_DATA);
-		spin_unlock_irqrestore(&rdev->mmio_idx_lock, flags);
+		DRM_SPINLOCK_IRQSAVE(&rdev->mmio_idx_lock, flags);
+		bus_write_4(rdev->rmmio, RADEON_MM_INDEX, reg);
+		bus_write_4(rdev->rmmio, RADEON_MM_DATA, v);
+		DRM_SPINUNLOCK_IRQRESTORE(&rdev->mmio_idx_lock, flags);
 	}
 }
 
 u32 r100_io_rreg(struct radeon_device *rdev, u32 reg)
 {
 	if (reg < rdev->rio_mem_size)
-		return ioread32(rdev->rio_mem + reg);
+		return bus_read_4(rdev->rio_mem, reg);
 	else {
-		iowrite32(reg, rdev->rio_mem + RADEON_MM_INDEX);
-		return ioread32(rdev->rio_mem + RADEON_MM_DATA);
+		/* XXX No locking? -- dumbbell@ */
+		bus_write_4(rdev->rio_mem, RADEON_MM_INDEX, reg);
+		return bus_read_4(rdev->rio_mem, RADEON_MM_DATA);
 	}
 }
 
 void r100_io_wreg(struct radeon_device *rdev, u32 reg, u32 v)
 {
 	if (reg < rdev->rio_mem_size)
-		iowrite32(v, rdev->rio_mem + reg);
+		bus_write_4(rdev->rio_mem, reg, v);
 	else {
-		iowrite32(reg, rdev->rio_mem + RADEON_MM_INDEX);
-		iowrite32(v, rdev->rio_mem + RADEON_MM_DATA);
+		/* XXX No locking? -- dumbbell@ */
+		bus_write_4(rdev->rio_mem, RADEON_MM_INDEX, reg);
+		bus_write_4(rdev->rio_mem, RADEON_MM_DATA, v);
 	}
 }

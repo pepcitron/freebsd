@@ -23,9 +23,13 @@
  *
  */
 
-#include <drm/drmP.h>
-#include <drm/radeon_drm.h>
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 #include "radeon.h"
+#include "radeon_asic.h"
 
 #include "r600d.h"
 #include "r600_blit_shaders.h"
@@ -40,7 +44,7 @@ set_render_target(struct radeon_device *rdev, int format,
 	u32 cb_color_info;
 	int pitch, slice;
 
-	h = ALIGN(h, 8);
+	h = roundup2(h, 8);
 	if (h < 8)
 		h = 8;
 
@@ -432,7 +436,7 @@ set_default_state(struct radeon_device *rdev)
 				    NUM_ES_STACK_ENTRIES(num_es_stack_entries));
 
 	/* emit an IB pointing at default state */
-	dwords = ALIGN(rdev->r600_blit.state_len, 0x10);
+	dwords = roundup2(rdev->r600_blit.state_len, 0x10);
 	gpu_addr = rdev->r600_blit.shader_gpu_addr + rdev->r600_blit.state_offset;
 	radeon_ring_write(ring, PACKET3(PACKET3_INDIRECT_BUFFER, 2));
 	radeon_ring_write(ring,
@@ -497,15 +501,15 @@ int r600_blit_init(struct radeon_device *rdev)
 	}
 
 	obj_size = dwords * 4;
-	obj_size = ALIGN(obj_size, 256);
+	obj_size = roundup2(obj_size, 256);
 
 	rdev->r600_blit.vs_offset = obj_size;
 	obj_size += r6xx_vs_size * 4;
-	obj_size = ALIGN(obj_size, 256);
+	obj_size = roundup2(obj_size, 256);
 
 	rdev->r600_blit.ps_offset = obj_size;
 	obj_size += r6xx_ps_size * 4;
-	obj_size = ALIGN(obj_size, 256);
+	obj_size = roundup2(obj_size, 256);
 
 	/* pin copy shader into vram if not already initialized */
 	if (rdev->r600_blit.shader_obj == NULL) {
@@ -542,13 +546,13 @@ int r600_blit_init(struct radeon_device *rdev)
 		return r;
 	}
 	if (rdev->family >= CHIP_RV770)
-		memcpy_toio(ptr + rdev->r600_blit.state_offset,
+		memcpy_toio((char *)ptr + rdev->r600_blit.state_offset,
 			    r7xx_default_state, rdev->r600_blit.state_len * 4);
 	else
-		memcpy_toio(ptr + rdev->r600_blit.state_offset,
+		memcpy_toio((char *)ptr + rdev->r600_blit.state_offset,
 			    r6xx_default_state, rdev->r600_blit.state_len * 4);
 	if (num_packet2s)
-		memcpy_toio(ptr + rdev->r600_blit.state_offset + (rdev->r600_blit.state_len * 4),
+		memcpy_toio((char *)ptr + rdev->r600_blit.state_offset + (rdev->r600_blit.state_len * 4),
 			    packet2s, num_packet2s * 4);
 	for (i = 0; i < r6xx_vs_size; i++)
 		*(u32 *)((unsigned long)ptr + rdev->r600_blit.vs_offset + i * 4) = cpu_to_le32(r6xx_vs[i]);
@@ -591,7 +595,7 @@ static unsigned r600_blit_create_rect(unsigned num_gpu_pages,
 		h = 0;
 		w = 0;
 		pages = 0;
-		WARN_ON(1);
+		DRM_ERROR("%s: called with no pages", __func__);
 	} else {
 		int rect_order = 2;
 		h = RECT_UNIT_H;
@@ -609,7 +613,7 @@ static unsigned r600_blit_create_rect(unsigned num_gpu_pages,
 		w = (pages * RECT_UNIT_W * RECT_UNIT_H) / h;
 		w = (w / RECT_UNIT_W) * RECT_UNIT_W;
 		pages = (w * h) / (RECT_UNIT_W * RECT_UNIT_H);
-		BUG_ON(pages == 0);
+		KASSERT(pages != 0, "r600_blit_create_rect: pages == 0");
 	}
 
 
@@ -704,7 +708,7 @@ void r600_kms_blit_copy(struct radeon_device *rdev,
 	u64 vb_gpu_addr;
 	u32 *vb_cpu_addr;
 
-	DRM_DEBUG("emitting copy %16llx %16llx %d\n",
+	DRM_DEBUG("emitting copy %16lx %16lx %d\n",
 		  src_gpu_addr, dst_gpu_addr, num_gpu_pages);
 	vb_cpu_addr = (u32 *)radeon_sa_bo_cpu_addr(vb);
 	vb_gpu_addr = radeon_sa_bo_gpu_addr(vb);

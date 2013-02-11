@@ -25,8 +25,12 @@
  *          Alex Deucher
  *          Jerome Glisse
  */
-#include <drm/drmP.h>
-#include <drm/radeon_drm.h>
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 #include "radeon.h"
 #include "radeon_reg.h"
 
@@ -65,21 +69,23 @@
  */
 int radeon_gart_table_ram_alloc(struct radeon_device *rdev)
 {
-	void *ptr;
+	drm_dma_handle_t *dmah;
 
-	ptr = pci_alloc_consistent(rdev->pdev, rdev->gart.table_size,
-				   &rdev->gart.table_addr);
-	if (ptr == NULL) {
+	dmah = drm_pci_alloc(rdev->ddev, rdev->gart.table_size,
+	    PAGE_SIZE, 0xFFFFFFFFUL);
+	if (dmah == NULL) {
 		return -ENOMEM;
 	}
-#ifdef CONFIG_X86
+	rdev->gart.dmah = dmah;
+	rdev->gart.ptr = dmah->vaddr;
+#if defined(__i386) || defined(__amd64)
 	if (rdev->family == CHIP_RS400 || rdev->family == CHIP_RS480 ||
 	    rdev->family == CHIP_RS690 || rdev->family == CHIP_RS740) {
-		set_memory_uc((unsigned long)ptr,
-			      rdev->gart.table_size >> PAGE_SHIFT);
+		pmap_change_attr((vm_offset_t)rdev->gart.ptr,
+		    rdev->gart.table_size >> PAGE_SHIFT, PAT_UNCACHED);
 	}
 #endif
-	rdev->gart.ptr = ptr;
+	rdev->gart.table_addr = dmah->busaddr;
 	memset((void *)rdev->gart.ptr, 0, rdev->gart.table_size);
 	return 0;
 }
@@ -98,16 +104,15 @@ void radeon_gart_table_ram_free(struct radeon_device *rdev)
 	if (rdev->gart.ptr == NULL) {
 		return;
 	}
-#ifdef CONFIG_X86
+#if defined(__i386) || defined(__amd64)
 	if (rdev->family == CHIP_RS400 || rdev->family == CHIP_RS480 ||
 	    rdev->family == CHIP_RS690 || rdev->family == CHIP_RS740) {
-		set_memory_wb((unsigned long)rdev->gart.ptr,
-			      rdev->gart.table_size >> PAGE_SHIFT);
+		pmap_change_attr((vm_offset_t)rdev->gart.ptr,
+		    rdev->gart.table_size >> PAGE_SHIFT, PAT_WRITE_COMBINING);
 	}
 #endif
-	pci_free_consistent(rdev->pdev, rdev->gart.table_size,
-			    (void *)rdev->gart.ptr,
-			    rdev->gart.table_addr);
+	drm_pci_free(rdev->ddev, rdev->gart.dmah);
+	rdev->gart.dmah = NULL;
 	rdev->gart.ptr = NULL;
 	rdev->gart.table_addr = 0;
 }
@@ -233,7 +238,7 @@ void radeon_gart_unbind(struct radeon_device *rdev, unsigned offset,
 	u64 page_base;
 
 	if (!rdev->gart.ready) {
-		WARN(1, "trying to unbind memory from uninitialized GART !\n");
+		DRM_ERROR("trying to unbind memory from uninitialized GART !\n");
 		return;
 	}
 	t = offset / RADEON_GPU_PAGE_SIZE;
@@ -269,7 +274,7 @@ void radeon_gart_unbind(struct radeon_device *rdev, unsigned offset,
  * Returns 0 for success, -EINVAL for failure.
  */
 int radeon_gart_bind(struct radeon_device *rdev, unsigned offset,
-		     int pages, struct page **pagelist, dma_addr_t *dma_addr)
+		     int pages, vm_page_t *pagelist, dma_addr_t *dma_addr)
 {
 	unsigned t;
 	unsigned p;
@@ -277,7 +282,7 @@ int radeon_gart_bind(struct radeon_device *rdev, unsigned offset,
 	int i, j;
 
 	if (!rdev->gart.ready) {
-		WARN(1, "trying to bind memory to uninitialized GART !\n");
+		DRM_ERROR("trying to bind memory to uninitialized GART !\n");
 		return -EINVAL;
 	}
 	t = offset / RADEON_GPU_PAGE_SIZE;
@@ -355,13 +360,15 @@ int radeon_gart_init(struct radeon_device *rdev)
 	DRM_INFO("GART: num cpu pages %u, num gpu pages %u\n",
 		 rdev->gart.num_cpu_pages, rdev->gart.num_gpu_pages);
 	/* Allocate pages table */
-	rdev->gart.pages = vzalloc(sizeof(void *) * rdev->gart.num_cpu_pages);
+	rdev->gart.pages = malloc(sizeof(void *) * rdev->gart.num_cpu_pages,
+	    DRM_MEM_DRIVER, M_ZERO | M_WAITOK);
 	if (rdev->gart.pages == NULL) {
 		radeon_gart_fini(rdev);
 		return -ENOMEM;
 	}
-	rdev->gart.pages_addr = vzalloc(sizeof(dma_addr_t) *
-					rdev->gart.num_cpu_pages);
+	rdev->gart.pages_addr = malloc(sizeof(dma_addr_t) *
+					rdev->gart.num_cpu_pages,
+					DRM_MEM_DRIVER, M_ZERO | M_WAITOK);
 	if (rdev->gart.pages_addr == NULL) {
 		radeon_gart_fini(rdev);
 		return -ENOMEM;
@@ -387,8 +394,8 @@ void radeon_gart_fini(struct radeon_device *rdev)
 		radeon_gart_unbind(rdev, 0, rdev->gart.num_cpu_pages);
 	}
 	rdev->gart.ready = false;
-	vfree(rdev->gart.pages);
-	vfree(rdev->gart.pages_addr);
+	free(rdev->gart.pages, DRM_MEM_DRIVER);
+	free(rdev->gart.pages_addr, DRM_MEM_DRIVER);
 	rdev->gart.pages = NULL;
 	rdev->gart.pages_addr = NULL;
 
@@ -529,7 +536,7 @@ static void radeon_vm_free_pt(struct radeon_device *rdev,
 	for (i = 0; i < radeon_vm_num_pdes(rdev); i++)
 		radeon_sa_bo_free(rdev, &vm->page_tables[i], vm->fence);
 
-	kfree(vm->page_tables);
+	free(vm->page_tables, DRM_MEM_DRIVER);
 }
 
 /**
@@ -547,18 +554,18 @@ void radeon_vm_manager_fini(struct radeon_device *rdev)
 	if (!rdev->vm_manager.enabled)
 		return;
 
-	mutex_lock(&rdev->vm_manager.lock);
+	sx_xlock(&rdev->vm_manager.lock);
 	/* free all allocated page tables */
 	list_for_each_entry_safe(vm, tmp, &rdev->vm_manager.lru_vm, list) {
-		mutex_lock(&vm->mutex);
+		sx_xlock(&vm->mutex);
 		radeon_vm_free_pt(rdev, vm);
-		mutex_unlock(&vm->mutex);
+		sx_xunlock(&vm->mutex);
 	}
 	for (i = 0; i < RADEON_NUM_VM; ++i) {
 		radeon_fence_unref(&rdev->vm_manager.active[i]);
 	}
 	radeon_asic_vm_fini(rdev);
-	mutex_unlock(&rdev->vm_manager.lock);
+	sx_xunlock(&rdev->vm_manager.lock);
 
 	radeon_sa_bo_manager_suspend(rdev, &rdev->vm_manager.sa_manager);
 	radeon_sa_bo_manager_fini(rdev, &rdev->vm_manager.sa_manager);
@@ -588,9 +595,9 @@ static int radeon_vm_evict(struct radeon_device *rdev, struct radeon_vm *vm)
 	if (vm_evict == vm)
 		return -ENOMEM;
 
-	mutex_lock(&vm_evict->mutex);
+	sx_xlock(&vm_evict->mutex);
 	radeon_vm_free_pt(rdev, vm_evict);
-	mutex_unlock(&vm_evict->mutex);
+	sx_xunlock(&vm_evict->mutex);
 	return 0;
 }
 
@@ -641,7 +648,7 @@ retry:
 	memset(pd_addr, 0, pd_size);
 
 	pts_size = radeon_vm_num_pdes(rdev) * sizeof(struct radeon_sa_bo *);
-	vm->page_tables = kzalloc(pts_size, GFP_KERNEL);
+	vm->page_tables = malloc(pts_size, DRM_MEM_DRIVER, M_ZERO | M_WAITOK);
 
 	if (vm->page_tables == NULL) {
 		DRM_ERROR("Cannot allocate memory for page table array\n");
@@ -718,7 +725,7 @@ struct radeon_fence *radeon_vm_grab_id(struct radeon_device *rdev,
 	}
 
 	/* should never happen */
-	BUG();
+	panic("%s: failed to allocate next VMID", __func__);
 	return NULL;
 }
 
@@ -789,7 +796,8 @@ struct radeon_bo_va *radeon_vm_bo_add(struct radeon_device *rdev,
 {
 	struct radeon_bo_va *bo_va;
 
-	bo_va = kzalloc(sizeof(struct radeon_bo_va), GFP_KERNEL);
+	bo_va = malloc(sizeof(struct radeon_bo_va),
+	    DRM_MEM_DRIVER, M_ZERO | M_WAITOK);
 	if (bo_va == NULL) {
 		return NULL;
 	}
@@ -803,10 +811,10 @@ struct radeon_bo_va *radeon_vm_bo_add(struct radeon_device *rdev,
 	INIT_LIST_HEAD(&bo_va->bo_list);
 	INIT_LIST_HEAD(&bo_va->vm_list);
 
-	mutex_lock(&vm->mutex);
+	sx_xlock(&vm->mutex);
 	list_add(&bo_va->vm_list, &vm->va);
 	list_add_tail(&bo_va->bo_list, &bo->va);
-	mutex_unlock(&vm->mutex);
+	sx_xunlock(&vm->mutex);
 
 	return bo_va;
 }
@@ -855,7 +863,7 @@ int radeon_vm_bo_set_addr(struct radeon_device *rdev,
 		eoffset = last_pfn = 0;
 	}
 
-	mutex_lock(&vm->mutex);
+	sx_xlock(&vm->mutex);
 	head = &vm->va;
 	last_offset = 0;
 	list_for_each_entry(tmp, &vm->va, vm_list) {
@@ -873,7 +881,7 @@ int radeon_vm_bo_set_addr(struct radeon_device *rdev,
 			dev_err(rdev->dev, "bo %p va 0x%08X conflict with (bo %p 0x%08X 0x%08X)\n",
 				bo_va->bo, (unsigned)bo_va->soffset, tmp->bo,
 				(unsigned)tmp->soffset, (unsigned)tmp->eoffset);
-			mutex_unlock(&vm->mutex);
+			sx_xunlock(&vm->mutex);
 			return -EINVAL;
 		}
 		last_offset = tmp->eoffset;
@@ -886,7 +894,7 @@ int radeon_vm_bo_set_addr(struct radeon_device *rdev,
 	bo_va->valid = false;
 	list_move(&bo_va->vm_list, head);
 
-	mutex_unlock(&vm->mutex);
+	sx_xunlock(&vm->mutex);
 	return 0;
 }
 
@@ -1211,15 +1219,15 @@ int radeon_vm_bo_rmv(struct radeon_device *rdev,
 {
 	int r;
 
-	mutex_lock(&rdev->vm_manager.lock);
-	mutex_lock(&bo_va->vm->mutex);
+	sx_xlock(&rdev->vm_manager.lock);
+	sx_xlock(&bo_va->vm->mutex);
 	r = radeon_vm_bo_update_pte(rdev, bo_va->vm, bo_va->bo, NULL);
-	mutex_unlock(&rdev->vm_manager.lock);
+	sx_xunlock(&rdev->vm_manager.lock);
 	list_del(&bo_va->vm_list);
-	mutex_unlock(&bo_va->vm->mutex);
+	sx_xunlock(&bo_va->vm->mutex);
 	list_del(&bo_va->bo_list);
 
-	kfree(bo_va);
+	free(bo_va, DRM_MEM_DRIVER);
 	return r;
 }
 
@@ -1254,7 +1262,7 @@ void radeon_vm_init(struct radeon_device *rdev, struct radeon_vm *vm)
 {
 	vm->id = 0;
 	vm->fence = NULL;
-	mutex_init(&vm->mutex);
+	sx_init(&vm->mutex, "drm__radeon_vm__mutex");
 	INIT_LIST_HEAD(&vm->list);
 	INIT_LIST_HEAD(&vm->va);
 }
@@ -1273,10 +1281,10 @@ void radeon_vm_fini(struct radeon_device *rdev, struct radeon_vm *vm)
 	struct radeon_bo_va *bo_va, *tmp;
 	int r;
 
-	mutex_lock(&rdev->vm_manager.lock);
-	mutex_lock(&vm->mutex);
+	sx_xlock(&rdev->vm_manager.lock);
+	sx_xlock(&vm->mutex);
 	radeon_vm_free_pt(rdev, vm);
-	mutex_unlock(&rdev->vm_manager.lock);
+	sx_xunlock(&rdev->vm_manager.lock);
 
 	if (!list_empty(&vm->va)) {
 		dev_err(rdev->dev, "still active bo inside vm\n");
@@ -1287,10 +1295,10 @@ void radeon_vm_fini(struct radeon_device *rdev, struct radeon_vm *vm)
 		if (!r) {
 			list_del_init(&bo_va->bo_list);
 			radeon_bo_unreserve(bo_va->bo);
-			kfree(bo_va);
+			free(bo_va, DRM_MEM_DRIVER);
 		}
 	}
 	radeon_fence_unref(&vm->fence);
 	radeon_fence_unref(&vm->last_flush);
-	mutex_unlock(&vm->mutex);
+	sx_xunlock(&vm->mutex);
 }

@@ -111,7 +111,7 @@ extern int radeon_lockup_timeout;
  * symbol;
  */
 #define RADEON_MAX_USEC_TIMEOUT			100000	/* 100 ms */
-#define RADEON_FENCE_JIFFIES_TIMEOUT		(HZ / 2)
+#define RADEON_FENCE_JIFFIES_TIMEOUT		(DRM_HZ / 2)
 /* RADEON_IB_POOL_SIZE must be a power of 2 */
 #define RADEON_IB_POOL_SIZE			16
 #define RADEON_DEBUGFS_MAX_COMPONENTS		32
@@ -230,9 +230,7 @@ struct radeon_fence_driver {
 
 struct radeon_fence {
 	struct radeon_device		*rdev;
-#ifdef DUMBBELL_WIP
-	struct kref			kref;
-#endif /* DUMBBELL_WIP */
+	unsigned int			kref;
 	/* protected by radeon_fence.lock */
 	uint64_t			seq;
 	/* RB, DMA, etc. */
@@ -391,7 +389,8 @@ struct radeon_bo_list {
  * alignment).
  */
 struct radeon_sa_manager {
-	wait_queue_head_t	wq;
+	struct cv		wq;
+	struct sx		wq_lock;
 	struct radeon_bo	*bo;
 	struct list_head	*hole;
 	struct list_head	flist[RADEON_NUM_RINGS];
@@ -473,13 +472,14 @@ struct radeon_mc;
 #define RADEON_GPU_PAGE_ALIGN(a) (((a) + RADEON_GPU_PAGE_MASK) & ~RADEON_GPU_PAGE_MASK)
 
 struct radeon_gart {
+	drm_dma_handle_t		*dmah;
 	dma_addr_t			table_addr;
 	struct radeon_bo		*robj;
 	void				*ptr;
 	unsigned			num_gpu_pages;
 	unsigned			num_cpu_pages;
 	unsigned			table_size;
-	struct page			**pages;
+	vm_page_t			*pages;
 	dma_addr_t			*pages_addr;
 	bool				ready;
 };
@@ -546,9 +546,7 @@ void radeon_scratch_free(struct radeon_device *rdev, uint32_t reg);
  */
 
 struct radeon_unpin_work {
-#ifdef DUMBBELL_WIP
-	struct work_struct work;
-#endif /* DUMBBELL_WIP */
+	struct task work;
 	struct radeon_device *rdev;
 	int crtc_id;
 	struct radeon_fence *fence;
@@ -845,7 +843,7 @@ struct radeon_cs_chunk {
 };
 
 struct radeon_cs_parser {
-	struct device		*dev;
+	device_t		dev;
 	struct radeon_device	*rdev;
 	struct drm_file		*filp;
 	/* chunks */
@@ -1602,7 +1600,8 @@ struct radeon_device {
 	struct radeon_scratch		scratch;
 	struct radeon_mman		mman;
 	struct radeon_fence_driver	fence_drv[RADEON_NUM_RINGS];
-	wait_queue_head_t		fence_queue;
+	struct cv			fence_queue;
+	struct mtx			fence_queue_mtx;
 	struct sx			ring_lock;
 	struct radeon_ring		ring[RADEON_NUM_RINGS];
 	bool				ib_pool_ready;
@@ -1931,9 +1930,7 @@ int radeon_vm_bo_rmv(struct radeon_device *rdev,
 		     struct radeon_bo_va *bo_va);
 
 /* audio */
-#ifdef DUMBBELL_WIP
-void r600_audio_update_hdmi(struct work_struct *work);
-#endif /* DUMBBELL_WIP */
+void r600_audio_update_hdmi(void *arg, int pending);
 
 /*
  * R600 vram scratch functions
@@ -2013,6 +2010,40 @@ void	radeon_combios_connected_scratch_regs(struct drm_connector *connector,
 /* radeon_connectors.c */
 void	radeon_atombios_connected_scratch_regs(struct drm_connector *connector,
 	    struct drm_encoder *encoder, bool connected);
+void	radeon_add_legacy_connector(struct drm_device *dev,
+	    uint32_t connector_id,
+	    uint32_t supported_device,
+	    int connector_type,
+	    struct radeon_i2c_bus_rec *i2c_bus,
+	    uint16_t connector_object_id,
+	    struct radeon_hpd *hpd);
+void	radeon_add_atom_connector(struct drm_device *dev,
+	    uint32_t connector_id,
+	    uint32_t supported_device,
+	    int connector_type,
+	    struct radeon_i2c_bus_rec *i2c_bus,
+	    uint32_t igp_lane_info,
+	    uint16_t connector_object_id,
+	    struct radeon_hpd *hpd,
+	    struct radeon_router *router);
+
+/* radeon_device.c */
+int radeon_suspend_kms(struct drm_device *dev);
+int radeon_resume_kms(struct drm_device *dev);
+
+/* radeon_encoders.c */
+uint32_t	radeon_get_encoder_enum(struct drm_device *dev,
+		    uint32_t supported_device, uint8_t dac);
+void		radeon_link_encoder_connector(struct drm_device *dev);
+void		radeon_add_atom_encoder(struct drm_device *dev,
+		    uint32_t encoder_enum,
+		    uint32_t supported_device, u16 caps);
+
+/* radeon_legacy_encoders.c */
+void	radeon_add_legacy_encoder(struct drm_device *dev,
+	    uint32_t encoder_enum, uint32_t supported_device);
+void	radeon_legacy_backlight_init(struct radeon_encoder *radeon_encoder,
+	    struct drm_connector *drm_connector);
 
 /* radeon_pm.c */
 void	radeon_pm_acpi_event_handler(struct radeon_device *rdev);
@@ -2020,6 +2051,10 @@ void	radeon_pm_acpi_event_handler(struct radeon_device *rdev);
 /* radeon_ttm.c */
 int	radeon_ttm_init(struct radeon_device *rdev);
 void	radeon_ttm_fini(struct radeon_device *rdev);
+
+/* r600.c */
+int r600_ih_ring_alloc(struct radeon_device *rdev);
+void r600_ih_ring_fini(struct radeon_device *rdev);
 
 #include "radeon_object.h"
 

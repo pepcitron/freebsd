@@ -41,7 +41,11 @@
  * If we are asked to block we wait on all the oldest fence of all
  * rings. We just wait for any of those fence to complete.
  */
-#include <drm/drmP.h>
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
 #include "radeon.h"
 
 static void radeon_sa_bo_remove_locked(struct radeon_sa_bo *sa_bo);
@@ -53,7 +57,8 @@ int radeon_sa_bo_manager_init(struct radeon_device *rdev,
 {
 	int i, r;
 
-	init_waitqueue_head(&sa_manager->wq);
+	sx_init(&sa_manager->wq_lock, "drm__radeon_sa_manager_wq_mtx");
+	cv_init(&sa_manager->wq, "drm__radeon_sa_manager__wq");
 	sa_manager->bo = NULL;
 	sa_manager->size = size;
 	sa_manager->domain = domain;
@@ -90,6 +95,8 @@ void radeon_sa_bo_manager_fini(struct radeon_device *rdev,
 	}
 	radeon_bo_unref(&sa_manager->bo);
 	sa_manager->size = 0;
+	cv_destroy(&sa_manager->wq);
+	sx_destroy(&sa_manager->wq_lock);
 }
 
 int radeon_sa_bo_manager_start(struct radeon_device *rdev,
@@ -147,7 +154,7 @@ static void radeon_sa_bo_remove_locked(struct radeon_sa_bo *sa_bo)
 	list_del_init(&sa_bo->olist);
 	list_del_init(&sa_bo->flist);
 	radeon_fence_unref(&sa_bo->fence);
-	kfree(sa_bo);
+	free(sa_bo, DRM_MEM_DRIVER);
 }
 
 static void radeon_sa_bo_try_free(struct radeon_sa_manager *sa_manager)
@@ -317,10 +324,10 @@ int radeon_sa_bo_new(struct radeon_device *rdev,
 	unsigned tries[RADEON_NUM_RINGS];
 	int i, r;
 
-	BUG_ON(align > RADEON_GPU_PAGE_SIZE);
-	BUG_ON(size > sa_manager->size);
+	KASSERT(align <= RADEON_GPU_PAGE_SIZE, "align > RADEON_GPU_PAGE_SIZE");
+	KASSERT(size <= sa_manager->size, "size > sa_manager->size");
 
-	*sa_bo = kmalloc(sizeof(struct radeon_sa_bo), GFP_KERNEL);
+	*sa_bo = malloc(sizeof(struct radeon_sa_bo), DRM_MEM_DRIVER, M_WAITOK);
 	if ((*sa_bo) == NULL) {
 		return -ENOMEM;
 	}
@@ -329,7 +336,7 @@ int radeon_sa_bo_new(struct radeon_device *rdev,
 	INIT_LIST_HEAD(&(*sa_bo)->olist);
 	INIT_LIST_HEAD(&(*sa_bo)->flist);
 
-	spin_lock(&sa_manager->wq.lock);
+	sx_xlock(&sa_manager->wq_lock);
 	do {
 		for (i = 0; i < RADEON_NUM_RINGS; ++i) {
 			fences[i] = NULL;
@@ -341,22 +348,24 @@ int radeon_sa_bo_new(struct radeon_device *rdev,
 
 			if (radeon_sa_bo_try_alloc(sa_manager, *sa_bo,
 						   size, align)) {
-				spin_unlock(&sa_manager->wq.lock);
+				sx_xunlock(&sa_manager->wq_lock);
 				return 0;
 			}
 
 			/* see if we can skip over some allocations */
 		} while (radeon_sa_bo_next_hole(sa_manager, fences, tries));
 
-		spin_unlock(&sa_manager->wq.lock);
+		sx_xlock(&sa_manager->wq_lock);
 		r = radeon_fence_wait_any(rdev, fences, false);
-		spin_lock(&sa_manager->wq.lock);
+		sx_xlock(&sa_manager->wq_lock);
 		/* if we have nothing to wait for block */
 		if (r == -ENOENT && block) {
-			r = wait_event_interruptible_locked(
-				sa_manager->wq, 
-				radeon_sa_event(sa_manager, size, align)
-			);
+			while (!radeon_sa_event(sa_manager, size, align)) {
+				r = -cv_wait_sig(&sa_manager->wq,
+				    &sa_manager->wq_lock);
+				if (r != 0)
+					break;
+			}
 
 		} else if (r == -ENOENT) {
 			r = -ENOMEM;
@@ -364,8 +373,8 @@ int radeon_sa_bo_new(struct radeon_device *rdev,
 
 	} while (!r);
 
-	spin_unlock(&sa_manager->wq.lock);
-	kfree(*sa_bo);
+	sx_xunlock(&sa_manager->wq_lock);
+	free(*sa_bo, DRM_MEM_DRIVER);
 	*sa_bo = NULL;
 	return r;
 }
@@ -380,7 +389,7 @@ void radeon_sa_bo_free(struct radeon_device *rdev, struct radeon_sa_bo **sa_bo,
 	}
 
 	sa_manager = (*sa_bo)->manager;
-	spin_lock(&sa_manager->wq.lock);
+	sx_xlock(&sa_manager->wq_lock);
 	if (fence && !radeon_fence_signaled(fence)) {
 		(*sa_bo)->fence = radeon_fence_ref(fence);
 		list_add_tail(&(*sa_bo)->flist,
@@ -388,8 +397,8 @@ void radeon_sa_bo_free(struct radeon_device *rdev, struct radeon_sa_bo **sa_bo,
 	} else {
 		radeon_sa_bo_remove_locked(*sa_bo);
 	}
-	wake_up_all_locked(&sa_manager->wq);
-	spin_unlock(&sa_manager->wq.lock);
+	cv_broadcast(&sa_manager->wq);
+	sx_xunlock(&sa_manager->wq_lock);
 	*sa_bo = NULL;
 }
 

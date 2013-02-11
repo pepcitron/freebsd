@@ -493,6 +493,8 @@ void cayman_dma_ring_ib_execute(struct radeon_device *rdev,
 				struct radeon_ib *ib);
 bool cayman_dma_is_lockup(struct radeon_device *rdev, struct radeon_ring *ring);
 void cayman_dma_vm_flush(struct radeon_device *rdev, int ridx, struct radeon_vm *vm);
+extern void cayman_cp_int_cntl_setup(struct radeon_device *rdev,
+				     int ring, u32 cp_int_cntl);
 
 /* DCE6 - SI */
 void dce6_bandwidth_update(struct radeon_device *rdev);
@@ -525,5 +527,7 @@ int si_copy_dma(struct radeon_device *rdev,
 		unsigned num_gpu_pages,
 		struct radeon_fence **fence);
 void si_dma_vm_flush(struct radeon_device *rdev, int ridx, struct radeon_vm *vm);
+void si_rlc_fini(struct radeon_device *rdev);
+int si_rlc_init(struct radeon_device *rdev);
 
 #endif

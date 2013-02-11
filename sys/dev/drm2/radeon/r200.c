@@ -25,8 +25,12 @@
  *          Alex Deucher
  *          Jerome Glisse
  */
-#include <drm/drmP.h>
-#include <drm/radeon_drm.h>
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 #include "radeon_reg.h"
 #include "radeon.h"
 #include "radeon_asic.h"
@@ -534,7 +538,7 @@ int r200_packet0_check(struct radeon_cs_parser *p,
 		track->tex_dirty = true;
 		break;
 	default:
-		printk(KERN_ERR "Forbidden register 0x%04X in cs at %d\n",
+		DRM_ERROR("Forbidden register 0x%04X in cs at %d\n",
 		       reg, idx);
 		return -EINVAL;
 	}
@@ -544,5 +548,5 @@ int r200_packet0_check(struct radeon_cs_parser *p,
 void r200_set_safe_registers(struct radeon_device *rdev)
 {
 	rdev->config.r100.reg_safe_bm = r200_reg_safe_bm;
-	rdev->config.r100.reg_safe_bm_size = ARRAY_SIZE(r200_reg_safe_bm);
+	rdev->config.r100.reg_safe_bm_size = DRM_ARRAY_SIZE(r200_reg_safe_bm);
 }

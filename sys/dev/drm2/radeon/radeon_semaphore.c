@@ -23,11 +23,15 @@
  * of the Software.
  *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
 /*
  * Authors:
  *    Christian König <deathsimple@vodafone.de>
  */
-#include <drm/drmP.h>
+#include <dev/drm2/drmP.h>
 #include "radeon.h"
 
 
@@ -36,14 +40,15 @@ int radeon_semaphore_create(struct radeon_device *rdev,
 {
 	int r;
 
-	*semaphore = kmalloc(sizeof(struct radeon_semaphore), GFP_KERNEL);
+	*semaphore = malloc(sizeof(struct radeon_semaphore),
+	    DRM_MEM_DRIVER, M_WAITOK);
 	if (*semaphore == NULL) {
 		return -ENOMEM;
 	}
 	r = radeon_sa_bo_new(rdev, &rdev->ring_tmp_bo,
 			     &(*semaphore)->sa_bo, 8, 8, true);
 	if (r) {
-		kfree(*semaphore);
+		free(*semaphore, DRM_MEM_DRIVER);
 		*semaphore = NULL;
 		return r;
 	}
@@ -110,6 +115,6 @@ void radeon_semaphore_free(struct radeon_device *rdev,
 			" hardware lockup imminent!\n", *semaphore);
 	}
 	radeon_sa_bo_free(rdev, &(*semaphore)->sa_bo, fence);
-	kfree(*semaphore);
+	free(*semaphore, DRM_MEM_DRIVER);
 	*semaphore = NULL;
 }

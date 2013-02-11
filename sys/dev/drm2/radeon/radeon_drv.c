@@ -37,6 +37,7 @@ __FBSDID("$FreeBSD$");
 #include "radeon_drv.h"
 #include "radeon_gem.h"
 #include "radeon_kms.h"
+#include "radeon_irq_kms.h"
 
 #include <dev/drm2/drm_pciids.h>
 
@@ -76,14 +77,8 @@ __FBSDID("$FreeBSD$");
 #define KMS_DRIVER_MAJOR	2
 #define KMS_DRIVER_MINOR	28
 #define KMS_DRIVER_PATCHLEVEL	0
-#ifdef DUMBBELL_WIP
-int radeon_suspend_kms(struct drm_device *dev, pm_message_t state);
-#endif /* DUMBBELL_WIP */
+int radeon_suspend_kms(struct drm_device *dev);
 int radeon_resume_kms(struct drm_device *dev);
-void radeon_driver_irq_preinstall_kms(struct drm_device *dev);
-int radeon_driver_irq_postinstall_kms(struct drm_device *dev);
-void radeon_driver_irq_uninstall_kms(struct drm_device *dev);
-irqreturn_t radeon_driver_irq_handler_kms(DRM_IRQ_ARGS);
 extern int radeon_get_crtc_scanoutpos(struct drm_device *dev, int crtc,
 				      int *vpos, int *hpos);
 extern struct drm_ioctl_desc radeon_ioctls_kms[];
@@ -243,8 +238,10 @@ static struct drm_driver driver_old = {
 	.postclose = radeon_driver_postclose,
 	.lastclose = radeon_driver_lastclose,
 	.unload = radeon_driver_unload,
+#ifdef DUMBBELL_WIP
 	.suspend = radeon_suspend,
 	.resume = radeon_resume,
+#endif /* DUMBBELL_WIP */
 	.get_vblank_counter = radeon_get_vblank_counter,
 	.enable_vblank = radeon_enable_vblank,
 	.disable_vblank = radeon_disable_vblank,
@@ -349,6 +346,7 @@ static struct drm_driver_info kms_driver = {
 	.dev_priv_size = 0,
 #endif /* DUMBBELL_WIP */
 	.load = radeon_driver_load_kms,
+	.use_msi = radeon_msi_ok,
 #ifdef DUMBBELL_WIP
 	.firstopen = radeon_driver_firstopen_kms,
 	.open = radeon_driver_open_kms,
@@ -466,12 +464,36 @@ radeon_attach(device_t kdev)
 	return (drm_attach(kdev, pciidlist));
 }
 
+static int
+radeon_suspend(device_t kdev)
+{
+	struct drm_device *dev;
+	int ret;
+
+	dev = device_get_softc(kdev);
+	ret = radeon_suspend_kms(dev);
+
+	return (-ret);
+}
+
+static int
+radeon_resume(device_t kdev)
+{
+	struct drm_device *dev;
+	int ret;
+
+	dev = device_get_softc(kdev);
+	ret = radeon_resume_kms(dev);
+
+	return (-ret);
+}
+
 static device_method_t radeon_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		radeon_probe),
 	DEVMETHOD(device_attach,	radeon_attach),
-	//DEVMETHOD(device_suspend,	radeon_suspend),
-	//DEVMETHOD(device_resume,	radeon_resume),
+	DEVMETHOD(device_suspend,	radeon_suspend),
+	DEVMETHOD(device_resume,	radeon_resume),
 	DEVMETHOD(device_detach,	drm_detach),
 	DEVMETHOD_END
 };
@@ -487,6 +509,6 @@ DRIVER_MODULE_ORDERED(radeonkms, vgapci, radeon_driver, drm_devclass,
     NULL, NULL, SI_ORDER_ANY);
 MODULE_DEPEND(radeonkms, drmn, 1, 1, 1);
 MODULE_DEPEND(radeonkms, agp, 1, 1, 1);
-//MODULE_DEPEND(radeonkms, iicbus, 1, 1, 1);
-//MODULE_DEPEND(radeonkms, iic, 1, 1, 1);
-//MODULE_DEPEND(radeonkms, iicbb, 1, 1, 1);
+MODULE_DEPEND(radeonkms, iicbus, 1, 1, 1);
+MODULE_DEPEND(radeonkms, iic, 1, 1, 1);
+MODULE_DEPEND(radeonkms, iicbb, 1, 1, 1);

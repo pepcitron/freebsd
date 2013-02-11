@@ -25,14 +25,10 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include <linux/firmware.h>
-#include <linux/platform_device.h>
-#include <linux/slab.h>
-#include <linux/module.h>
-#include <drm/drmP.h>
+#include <dev/drm2/drmP.h>
 #include "radeon.h"
 #include "radeon_asic.h"
-#include <drm/radeon_drm.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 #include "nid.h"
 #include "atom.h"
 #include "ni_reg.h"
@@ -40,8 +36,6 @@ __FBSDID("$FreeBSD$");
 
 extern int evergreen_mc_wait_for_idle(struct radeon_device *rdev);
 extern void evergreen_pcie_gen2_enable(struct radeon_device *rdev);
-extern void si_rlc_fini(struct radeon_device *rdev);
-extern int si_rlc_init(struct radeon_device *rdev);
 
 #define EVERGREEN_PFP_UCODE_SIZE 1120
 #define EVERGREEN_PM4_UCODE_SIZE 1376
@@ -55,6 +49,7 @@ extern int si_rlc_init(struct radeon_device *rdev);
 
 #define ARUBA_RLC_UCODE_SIZE 1536
 
+#ifdef DUMBBELL_WIP
 /* Firmware Names */
 MODULE_FIRMWARE("radeon/BARTS_pfp.bin");
 MODULE_FIRMWARE("radeon/BARTS_me.bin");
@@ -73,6 +68,7 @@ MODULE_FIRMWARE("radeon/CAYMAN_rlc.bin");
 MODULE_FIRMWARE("radeon/ARUBA_pfp.bin");
 MODULE_FIRMWARE("radeon/ARUBA_me.bin");
 MODULE_FIRMWARE("radeon/ARUBA_rlc.bin");
+#endif /* DUMBBELL_WIP */
 
 #define BTC_IO_MC_REGS_SIZE 29
 
@@ -270,7 +266,7 @@ int ni_mc_load_microcode(struct radeon_device *rdev)
 		for (i = 0; i < rdev->usec_timeout; i++) {
 			if (RREG32(MC_IO_PAD_CNTL_D0) & MEM_FALL_OUT_CMD)
 				break;
-			udelay(1);
+			DRM_UDELAY(1);
 		}
 
 		if (running)
@@ -282,7 +278,6 @@ int ni_mc_load_microcode(struct radeon_device *rdev)
 
 int ni_init_microcode(struct radeon_device *rdev)
 {
-	struct platform_device *pdev;
 	const char *chip_name;
 	const char *rlc_chip_name;
 	size_t pfp_req_size, me_req_size, rlc_req_size, mc_req_size;
@@ -290,13 +285,6 @@ int ni_init_microcode(struct radeon_device *rdev)
 	int err;
 
 	DRM_DEBUG("\n");
-
-	pdev = platform_device_register_simple("radeon_cp", 0, NULL, 0);
-	err = IS_ERR(pdev);
-	if (err) {
-		printk(KERN_ERR "radeon_cp: Failed to register firmware\n");
-		return -EINVAL;
-	}
 
 	switch (rdev->family) {
 	case CHIP_BARTS:
@@ -340,74 +328,89 @@ int ni_init_microcode(struct radeon_device *rdev)
 		rlc_req_size = ARUBA_RLC_UCODE_SIZE * 4;
 		mc_req_size = 0;
 		break;
-	default: BUG();
+	default: panic("%s: Unsupported family %d", __func__, rdev->family);
 	}
 
 	DRM_INFO("Loading %s Microcode\n", chip_name);
+	err = 0;
 
 	snprintf(fw_name, sizeof(fw_name), "radeon/%s_pfp.bin", chip_name);
-	err = request_firmware(&rdev->pfp_fw, fw_name, &pdev->dev);
-	if (err)
+	rdev->pfp_fw = firmware_get(fw_name);
+	if (rdev->pfp_fw == NULL) {
+		err = -ENOENT;
 		goto out;
-	if (rdev->pfp_fw->size != pfp_req_size) {
-		printk(KERN_ERR
+	}
+	if (rdev->pfp_fw->datasize != pfp_req_size) {
+		DRM_ERROR(
 		       "ni_cp: Bogus length %zu in firmware \"%s\"\n",
-		       rdev->pfp_fw->size, fw_name);
+		       rdev->pfp_fw->datasize, fw_name);
 		err = -EINVAL;
 		goto out;
 	}
 
 	snprintf(fw_name, sizeof(fw_name), "radeon/%s_me.bin", chip_name);
-	err = request_firmware(&rdev->me_fw, fw_name, &pdev->dev);
-	if (err)
+	rdev->me_fw = firmware_get(fw_name);
+	if (rdev->me_fw == NULL) {
+		err = -ENOENT;
 		goto out;
-	if (rdev->me_fw->size != me_req_size) {
-		printk(KERN_ERR
+	}
+	if (rdev->me_fw->datasize != me_req_size) {
+		DRM_ERROR(
 		       "ni_cp: Bogus length %zu in firmware \"%s\"\n",
-		       rdev->me_fw->size, fw_name);
+		       rdev->me_fw->datasize, fw_name);
 		err = -EINVAL;
 	}
 
 	snprintf(fw_name, sizeof(fw_name), "radeon/%s_rlc.bin", rlc_chip_name);
-	err = request_firmware(&rdev->rlc_fw, fw_name, &pdev->dev);
-	if (err)
+	rdev->rlc_fw = firmware_get(fw_name);
+	if (rdev->rlc_fw == NULL) {
+		err = -ENOENT;
 		goto out;
-	if (rdev->rlc_fw->size != rlc_req_size) {
-		printk(KERN_ERR
+	}
+	if (rdev->rlc_fw->datasize != rlc_req_size) {
+		DRM_ERROR(
 		       "ni_rlc: Bogus length %zu in firmware \"%s\"\n",
-		       rdev->rlc_fw->size, fw_name);
+		       rdev->rlc_fw->datasize, fw_name);
 		err = -EINVAL;
 	}
 
 	/* no MC ucode on TN */
 	if (!(rdev->flags & RADEON_IS_IGP)) {
 		snprintf(fw_name, sizeof(fw_name), "radeon/%s_mc.bin", chip_name);
-		err = request_firmware(&rdev->mc_fw, fw_name, &pdev->dev);
-		if (err)
+		rdev->mc_fw = firmware_get(fw_name);
+		if (rdev->mc_fw == NULL) {
+			err = -ENOENT;
 			goto out;
-		if (rdev->mc_fw->size != mc_req_size) {
-			printk(KERN_ERR
+		}
+		if (rdev->mc_fw->datasize != mc_req_size) {
+			DRM_ERROR(
 			       "ni_mc: Bogus length %zu in firmware \"%s\"\n",
-			       rdev->mc_fw->size, fw_name);
+			       rdev->mc_fw->datasize, fw_name);
 			err = -EINVAL;
 		}
 	}
 out:
-	platform_device_unregister(pdev);
-
 	if (err) {
 		if (err != -EINVAL)
-			printk(KERN_ERR
+			DRM_ERROR(
 			       "ni_cp: Failed to load firmware \"%s\"\n",
 			       fw_name);
-		release_firmware(rdev->pfp_fw);
-		rdev->pfp_fw = NULL;
-		release_firmware(rdev->me_fw);
-		rdev->me_fw = NULL;
-		release_firmware(rdev->rlc_fw);
-		rdev->rlc_fw = NULL;
-		release_firmware(rdev->mc_fw);
-		rdev->mc_fw = NULL;
+		if (rdev->pfp_fw != NULL) {
+			firmware_put(rdev->pfp_fw, FIRMWARE_UNLOAD);
+			rdev->pfp_fw = NULL;
+		}
+		if (rdev->me_fw != NULL) {
+			firmware_put(rdev->me_fw, FIRMWARE_UNLOAD);
+			rdev->me_fw = NULL;
+		}
+		if (rdev->rlc_fw != NULL) {
+			firmware_put(rdev->rlc_fw, FIRMWARE_UNLOAD);
+			rdev->rlc_fw = NULL;
+		}
+		if (rdev->mc_fw != NULL) {
+			firmware_put(rdev->mc_fw, FIRMWARE_UNLOAD);
+			rdev->mc_fw = NULL;
+		}
 	}
 	return err;
 }
@@ -457,29 +460,29 @@ static void cayman_gpu_init(struct radeon_device *rdev)
 		rdev->config.cayman.max_shader_engines = 1;
 		rdev->config.cayman.max_pipes_per_simd = 4;
 		rdev->config.cayman.max_tile_pipes = 2;
-		if ((rdev->pdev->device == 0x9900) ||
-		    (rdev->pdev->device == 0x9901) ||
-		    (rdev->pdev->device == 0x9905) ||
-		    (rdev->pdev->device == 0x9906) ||
-		    (rdev->pdev->device == 0x9907) ||
-		    (rdev->pdev->device == 0x9908) ||
-		    (rdev->pdev->device == 0x9909) ||
-		    (rdev->pdev->device == 0x9910) ||
-		    (rdev->pdev->device == 0x9917)) {
+		if ((rdev->ddev->pci_device == 0x9900) ||
+		    (rdev->ddev->pci_device == 0x9901) ||
+		    (rdev->ddev->pci_device == 0x9905) ||
+		    (rdev->ddev->pci_device == 0x9906) ||
+		    (rdev->ddev->pci_device == 0x9907) ||
+		    (rdev->ddev->pci_device == 0x9908) ||
+		    (rdev->ddev->pci_device == 0x9909) ||
+		    (rdev->ddev->pci_device == 0x9910) ||
+		    (rdev->ddev->pci_device == 0x9917)) {
 			rdev->config.cayman.max_simds_per_se = 6;
 			rdev->config.cayman.max_backends_per_se = 2;
-		} else if ((rdev->pdev->device == 0x9903) ||
-			   (rdev->pdev->device == 0x9904) ||
-			   (rdev->pdev->device == 0x990A) ||
-			   (rdev->pdev->device == 0x9913) ||
-			   (rdev->pdev->device == 0x9918)) {
+		} else if ((rdev->ddev->pci_device == 0x9903) ||
+			   (rdev->ddev->pci_device == 0x9904) ||
+			   (rdev->ddev->pci_device == 0x990A) ||
+			   (rdev->ddev->pci_device == 0x9913) ||
+			   (rdev->ddev->pci_device == 0x9918)) {
 			rdev->config.cayman.max_simds_per_se = 4;
 			rdev->config.cayman.max_backends_per_se = 2;
-		} else if ((rdev->pdev->device == 0x9919) ||
-			   (rdev->pdev->device == 0x9990) ||
-			   (rdev->pdev->device == 0x9991) ||
-			   (rdev->pdev->device == 0x9994) ||
-			   (rdev->pdev->device == 0x99A0)) {
+		} else if ((rdev->ddev->pci_device == 0x9919) ||
+			   (rdev->ddev->pci_device == 0x9990) ||
+			   (rdev->ddev->pci_device == 0x9991) ||
+			   (rdev->ddev->pci_device == 0x9994) ||
+			   (rdev->ddev->pci_device == 0x99A0)) {
 			rdev->config.cayman.max_simds_per_se = 3;
 			rdev->config.cayman.max_backends_per_se = 1;
 		} else {
@@ -711,7 +714,7 @@ static void cayman_gpu_init(struct radeon_device *rdev)
 
 	WREG32(PA_CL_ENHANCE, CLIP_VTX_REORDER_ENA | NUM_CLIP_SEQ(3));
 
-	udelay(50);
+	DRM_UDELAY(50);
 }
 
 /*
@@ -1058,7 +1061,7 @@ static int cayman_cp_resume(struct radeon_device *rdev)
 				 SOFT_RESET_SPI |
 				 SOFT_RESET_SX));
 	RREG32(GRBM_SOFT_RESET);
-	mdelay(15);
+	DRM_MDELAY(15);
 	WREG32(GRBM_SOFT_RESET, 0);
 	RREG32(GRBM_SOFT_RESET);
 
@@ -1108,7 +1111,7 @@ static int cayman_cp_resume(struct radeon_device *rdev)
 		WREG32(ring->rptr_reg, ring->rptr);
 		WREG32(ring->wptr_reg, ring->wptr);
 
-		mdelay(1);
+		DRM_MDELAY(1);
 		WREG32_P(cp_rb_cntl[i], 0, ~RB_RPTR_WR_ENA);
 	}
 
@@ -1222,7 +1225,7 @@ int cayman_dma_resume(struct radeon_device *rdev)
 	/* Reset dma */
 	WREG32(SRBM_SOFT_RESET, SOFT_RESET_DMA | SOFT_RESET_DMA1);
 	RREG32(SRBM_SOFT_RESET);
-	udelay(50);
+	DRM_UDELAY(50);
 	WREG32(SRBM_SOFT_RESET, 0);
 
 	for (i = 0; i < 2; i++) {
@@ -1349,7 +1352,7 @@ static void cayman_gpu_soft_reset_gfx(struct radeon_device *rdev)
 	dev_info(rdev->dev, "  GRBM_SOFT_RESET=0x%08X\n", grbm_reset);
 	WREG32(GRBM_SOFT_RESET, grbm_reset);
 	(void)RREG32(GRBM_SOFT_RESET);
-	udelay(50);
+	DRM_UDELAY(50);
 	WREG32(GRBM_SOFT_RESET, 0);
 	(void)RREG32(GRBM_SOFT_RESET);
 
@@ -1395,7 +1398,7 @@ static void cayman_gpu_soft_reset_dma(struct radeon_device *rdev)
 	/* Reset dma */
 	WREG32(SRBM_SOFT_RESET, SOFT_RESET_DMA | SOFT_RESET_DMA1);
 	RREG32(SRBM_SOFT_RESET);
-	udelay(50);
+	DRM_UDELAY(50);
 	WREG32(SRBM_SOFT_RESET, 0);
 
 	dev_info(rdev->dev, "  R_00D034_DMA_STATUS_REG   = 0x%08X\n",
@@ -1433,7 +1436,7 @@ static int cayman_gpu_soft_reset(struct radeon_device *rdev, u32 reset_mask)
 		cayman_gpu_soft_reset_dma(rdev);
 
 	/* Wait a little for things to settle down */
-	udelay(50);
+	DRM_UDELAY(50);
 
 	evergreen_mc_resume(rdev, &save);
 	return 0;
@@ -1783,7 +1786,7 @@ void cayman_fini(struct radeon_device *rdev)
 	radeon_fence_driver_fini(rdev);
 	radeon_bo_fini(rdev);
 	radeon_atombios_fini(rdev);
-	kfree(rdev->bios);
+	free(rdev->bios, DRM_MEM_DRIVER);
 	rdev->bios = NULL;
 }
 

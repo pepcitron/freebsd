@@ -86,10 +86,13 @@ int radeon_driver_load_kms(struct drm_device *dev, unsigned long flags)
 
 	/* update BUS flag */
 	if (drm_device_is_agp(dev)) {
+		DRM_INFO("RADEON_IS_AGP\n");
 		flags |= RADEON_IS_AGP;
 	} else if (drm_device_is_pcie(dev)) {
+		DRM_INFO("RADEON_IS_PCIE\n");
 		flags |= RADEON_IS_PCIE;
 	} else {
+		DRM_INFO("RADEON_IS_PCI\n");
 		flags |= RADEON_IS_PCI;
 	}
 
@@ -129,7 +132,6 @@ out:
 	return r;
 }
 
-#ifdef DUMBBELL_WIP
 /**
  * radeon_set_filp_rights - Set filp right.
  *
@@ -158,9 +160,7 @@ static void radeon_set_filp_rights(struct drm_device *dev,
 	*value = *owner == applier ? 1 : 0;
 	DRM_UNLOCK(dev);
 }
-#endif /* DUMBBELL_WIP */
 
-#ifdef DUMBBELL_WIP
 /*
  * Userspace get information ioctl
  */
@@ -176,7 +176,7 @@ static void radeon_set_filp_rights(struct drm_device *dev,
  * etc. (all asics).
  * Returns 0 on success, -EINVAL on failure.
  */
-int radeon_info_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
+static int radeon_info_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 {
 	struct radeon_device *rdev = dev->dev_private;
 	struct drm_radeon_info *info = data;
@@ -392,7 +392,6 @@ int radeon_info_ioctl(struct drm_device *dev, void *data, struct drm_file *filp)
 	}
 	return 0;
 }
-#endif /* DUMBBELL_WIP */
 
 
 /*
@@ -643,13 +642,13 @@ int radeon_dma_ioctl_kms(struct drm_device *dev, void *data,
 }
 
 #define KMS_INVALID_IOCTL(name)						\
-int name(struct drm_device *dev, void *data, struct drm_file *file_priv)\
+static int								\
+name(struct drm_device *dev, void *data, struct drm_file *file_priv)	\
 {									\
 	DRM_ERROR("invalid ioctl with kms %s\n", __func__);		\
 	return -EINVAL;							\
 }
 
-#ifdef DUMBBELL_WIP
 /*
  * All these ioctls are invalid in kms world.
  */
@@ -726,4 +725,3 @@ struct drm_ioctl_desc radeon_ioctls_kms[] = {
 	DRM_IOCTL_DEF_DRV(RADEON_GEM_VA, radeon_gem_va_ioctl, DRM_AUTH|DRM_UNLOCKED),
 };
 int radeon_max_kms_ioctl = DRM_ARRAY_SIZE(radeon_ioctls_kms);
-#endif /* DUMBBELL_WIP */

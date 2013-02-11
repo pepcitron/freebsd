@@ -35,12 +35,11 @@ __FBSDID("$FreeBSD$");
 #include "evergreend.h"
 #include "evergreen_reg_safe.h"
 #include "cayman_reg_safe.h"
+#include "r600_cs.h"
 
 #define MAX(a,b)                   (((a)>(b))?(a):(b))
 #define MIN(a,b)                   (((a)<(b))?(a):(b))
 
-int r600_dma_cs_next_reloc(struct radeon_cs_parser *p,
-			   struct radeon_cs_reloc **cs_reloc);
 static int evergreen_cs_packet_next_reloc(struct radeon_cs_parser *p,
 					  struct radeon_cs_reloc **cs_reloc);
 

@@ -24,9 +24,13 @@
  *    Dave Airlie
  *    Jerome Glisse <glisse@freedesktop.org>
  */
-#include <drm/drmP.h>
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
 #include "radeon.h"
-#include <drm/radeon_drm.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 
 #if __OS_HAS_AGP
 
@@ -149,11 +153,11 @@ int radeon_agp_init(struct radeon_device *rdev)
 		return ret;
 	}
 
-	if (rdev->ddev->agp->agp_info.aper_size < 32) {
+	if (rdev->ddev->agp->info.ai_aperture_size < 32) {
 		drm_agp_release(rdev->ddev);
 		dev_warn(rdev->dev, "AGP aperture too small (%zuM) "
 			"need at least 32M, disabling AGP\n",
-			rdev->ddev->agp->agp_info.aper_size);
+			rdev->ddev->agp->info.ai_aperture_size);
 		return -EINVAL;
 	}
 
@@ -183,10 +187,10 @@ int radeon_agp_init(struct radeon_device *rdev)
 	while (p && p->chip_device != 0) {
 		if (info.id_vendor == p->hostbridge_vendor &&
 		    info.id_device == p->hostbridge_device &&
-		    rdev->pdev->vendor == p->chip_vendor &&
-		    rdev->pdev->device == p->chip_device &&
-		    rdev->pdev->subsystem_vendor == p->subsys_vendor &&
-		    rdev->pdev->subsystem_device == p->subsys_device) {
+		    rdev->ddev->pci_vendor == p->chip_vendor &&
+		    rdev->ddev->pci_device == p->chip_device &&
+		    rdev->ddev->pci_subvendor == p->subsys_vendor &&
+		    rdev->ddev->pci_subdevice == p->subsys_device) {
 			default_mode = p->default_mode;
 		}
 		++p;
@@ -241,11 +245,11 @@ int radeon_agp_init(struct radeon_device *rdev)
 		return ret;
 	}
 
-	rdev->mc.agp_base = rdev->ddev->agp->agp_info.aper_base;
-	rdev->mc.gtt_size = rdev->ddev->agp->agp_info.aper_size << 20;
+	rdev->mc.agp_base = rdev->ddev->agp->info.ai_aperture_base;
+	rdev->mc.gtt_size = rdev->ddev->agp->info.ai_aperture_size << 20;
 	rdev->mc.gtt_start = rdev->mc.agp_base;
 	rdev->mc.gtt_end = rdev->mc.gtt_start + rdev->mc.gtt_size - 1;
-	dev_info(rdev->dev, "GTT: %lluM 0x%08llX - 0x%08llX\n",
+	dev_info(rdev->dev, "GTT: %luM 0x%08lX - 0x%08lX\n",
 		rdev->mc.gtt_size >> 20, rdev->mc.gtt_start, rdev->mc.gtt_end);
 
 	/* workaround some hw issues */

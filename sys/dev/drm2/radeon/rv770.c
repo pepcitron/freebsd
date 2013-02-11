@@ -25,13 +25,14 @@
  *          Alex Deucher
  *          Jerome Glisse
  */
-#include <linux/firmware.h>
-#include <linux/platform_device.h>
-#include <linux/slab.h>
-#include <drm/drmP.h>
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
 #include "radeon.h"
 #include "radeon_asic.h"
-#include <drm/radeon_drm.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 #include "rv770d.h"
 #include "atom.h"
 #include "avivod.h"
@@ -70,7 +71,7 @@ u32 rv770_page_flip(struct radeon_device *rdev, int crtc_id, u64 crtc_base)
 	for (i = 0; i < rdev->usec_timeout; i++) {
 		if (RREG32(AVIVO_D1GRPH_UPDATE + radeon_crtc->crtc_offset) & AVIVO_D1GRPH_SURFACE_UPDATE_PENDING)
 			break;
-		udelay(1);
+		DRM_UDELAY(1);
 	}
 	DRM_DEBUG("Update pending now high. Unlocking vupdate_lock.\n");
 
@@ -337,7 +338,7 @@ static int rv770_cp_load_microcode(struct radeon_device *rdev)
 	/* Reset cp */
 	WREG32(GRBM_SOFT_RESET, SOFT_RESET_CP);
 	RREG32(GRBM_SOFT_RESET);
-	mdelay(15);
+	DRM_MDELAY(15);
 	WREG32(GRBM_SOFT_RESET, 0);
 
 	fw_data = (const __be32 *)rdev->pfp_fw->data;
@@ -832,7 +833,7 @@ void r700_vram_gtt_location(struct radeon_device *rdev, struct radeon_mc *mc)
 			mc->vram_start = mc->gtt_end + 1;
 		}
 		mc->vram_end = mc->vram_start + mc->mc_vram_size - 1;
-		dev_info(rdev->dev, "VRAM: %lluM 0x%08llX - 0x%08llX (%lluM used)\n",
+		dev_info(rdev->dev, "VRAM: %luM 0x%08lX - 0x%08lX (%luM used)\n",
 				mc->mc_vram_size >> 20, mc->vram_start,
 				mc->vram_end, mc->real_vram_size >> 20);
 	} else {
@@ -875,8 +876,8 @@ static int rv770_mc_init(struct radeon_device *rdev)
 	}
 	rdev->mc.vram_width = numchan * chansize;
 	/* Could aper size report 0 ? */
-	rdev->mc.aper_base = pci_resource_start(rdev->pdev, 0);
-	rdev->mc.aper_size = pci_resource_len(rdev->pdev, 0);
+	rdev->mc.aper_base = drm_get_resource_start(rdev->ddev, 0);
+	rdev->mc.aper_size = drm_get_resource_len(rdev->ddev, 0);
 	/* Setup GPU memory space */
 	rdev->mc.mc_vram_size = RREG32(CONFIG_MEMSIZE);
 	rdev->mc.real_vram_size = RREG32(CONFIG_MEMSIZE);
@@ -1205,7 +1206,7 @@ void rv770_fini(struct radeon_device *rdev)
 	radeon_agp_fini(rdev);
 	radeon_bo_fini(rdev);
 	radeon_atombios_fini(rdev);
-	kfree(rdev->bios);
+	free(rdev->bios, DRM_MEM_DRIVER);
 	rdev->bios = NULL;
 }
 

@@ -50,7 +50,7 @@ static void radeon_bo_clear_surface_reg(struct radeon_bo *bo);
  * function are calling it.
  */
 
-void radeon_bo_clear_va(struct radeon_bo *bo)
+static void radeon_bo_clear_va(struct radeon_bo *bo)
 {
 	struct radeon_bo_va *bo_va, *tmp;
 
@@ -65,13 +65,13 @@ static void radeon_ttm_bo_destroy(struct ttm_buffer_object *tbo)
 	struct radeon_bo *bo;
 
 	bo = container_of(tbo, struct radeon_bo, tbo);
-	mutex_lock(&bo->rdev->gem.mutex);
+	sx_xlock(&bo->rdev->gem.mutex);
 	list_del_init(&bo->list);
-	mutex_unlock(&bo->rdev->gem.mutex);
+	sx_xunlock(&bo->rdev->gem.mutex);
 	radeon_bo_clear_surface_reg(bo);
 	radeon_bo_clear_va(bo);
 	drm_gem_object_release(&bo->gem_base);
-	kfree(bo);
+	free(bo, DRM_MEM_DRIVER);
 }
 
 bool radeon_ttm_bo_is_radeon_bo(struct ttm_buffer_object *bo)
@@ -125,13 +125,15 @@ int radeon_bo_create(struct radeon_device *rdev,
 {
 	struct radeon_bo *bo;
 	enum ttm_bo_type type;
-	unsigned long page_align = roundup(byte_align, PAGE_SIZE) >> PAGE_SHIFT;
+	unsigned long page_align = roundup2(byte_align, PAGE_SIZE) >> PAGE_SHIFT;
 	size_t acc_size;
 	int r;
 
-	size = ALIGN(size, PAGE_SIZE);
+	size = roundup2(size, PAGE_SIZE);
 
+#ifdef DUMBBELL_WIP
 	rdev->mman.bdev.dev_mapping = rdev->ddev->dev_mapping;
+#endif /* DUMBBELL_WIP */
 	if (kernel) {
 		type = ttm_bo_type_kernel;
 	} else if (sg) {
@@ -144,12 +146,13 @@ int radeon_bo_create(struct radeon_device *rdev,
 	acc_size = ttm_bo_dma_acc_size(&rdev->mman.bdev, size,
 				       sizeof(struct radeon_bo));
 
-	bo = kzalloc(sizeof(struct radeon_bo), GFP_KERNEL);
+	bo = malloc(sizeof(struct radeon_bo),
+	    DRM_MEM_DRIVER, M_ZERO | M_WAITOK);
 	if (bo == NULL)
 		return -ENOMEM;
 	r = drm_gem_object_init(rdev->ddev, &bo->gem_base, size);
 	if (unlikely(r)) {
-		kfree(bo);
+		free(bo, DRM_MEM_DRIVER);
 		return r;
 	}
 	bo->rdev = rdev;
@@ -159,17 +162,19 @@ int radeon_bo_create(struct radeon_device *rdev,
 	INIT_LIST_HEAD(&bo->va);
 	radeon_ttm_placement_from_domain(bo, domain);
 	/* Kernel allocation are uninterruptible */
-	down_read(&rdev->pm.mclk_lock);
+	rw_rlock(&rdev->pm.mclk_lock);
 	r = ttm_bo_init(&rdev->mman.bdev, &bo->tbo, size, type,
 			&bo->placement, page_align, !kernel, NULL,
 			acc_size, sg, &radeon_ttm_bo_destroy);
-	up_read(&rdev->pm.mclk_lock);
+	rw_runlock(&rdev->pm.mclk_lock);
 	if (unlikely(r != 0)) {
 		return r;
 	}
 	*bo_ptr = bo;
 
+#ifdef DUMBBELL_WIP
 	trace_radeon_bo_create(bo);
+#endif /* DUMBBELL_WIP */
 
 	return 0;
 }
@@ -215,9 +220,9 @@ void radeon_bo_unref(struct radeon_bo **bo)
 		return;
 	rdev = (*bo)->rdev;
 	tbo = &((*bo)->tbo);
-	down_read(&rdev->pm.mclk_lock);
+	rw_rlock(&rdev->pm.mclk_lock);
 	ttm_bo_unref(&tbo);
-	up_read(&rdev->pm.mclk_lock);
+	rw_runlock(&rdev->pm.mclk_lock);
 	if (tbo == NULL)
 		*bo = NULL;
 }
@@ -239,8 +244,14 @@ int radeon_bo_pin_restricted(struct radeon_bo *bo, u32 domain, u64 max_offset,
 				domain_start = bo->rdev->mc.vram_start;
 			else
 				domain_start = bo->rdev->mc.gtt_start;
-			WARN_ON_ONCE(max_offset <
-				     (radeon_bo_gpu_offset(bo) - domain_start));
+			if (max_offset < (radeon_bo_gpu_offset(bo) - domain_start)) {
+				DRM_ERROR("radeon_bo_pin_restricted: "
+				    "max_offset(%lu) < "
+				    "(radeon_bo_gpu_offset(%lu) - "
+				    "domain_start(%lu)",
+				    max_offset, radeon_bo_gpu_offset(bo),
+				    domain_start);
+			}
 		}
 
 		return 0;
@@ -316,25 +327,27 @@ void radeon_bo_force_delete(struct radeon_device *rdev)
 	}
 	dev_err(rdev->dev, "Userspace still has active objects !\n");
 	list_for_each_entry_safe(bo, n, &rdev->gem.objects, list) {
-		mutex_lock(&rdev->ddev->struct_mutex);
+		DRM_LOCK(rdev->ddev);
 		dev_err(rdev->dev, "%p %p %lu %lu force free\n",
 			&bo->gem_base, bo, (unsigned long)bo->gem_base.size,
 			*((unsigned long *)&bo->gem_base.refcount));
-		mutex_lock(&bo->rdev->gem.mutex);
+		sx_xlock(&bo->rdev->gem.mutex);
 		list_del_init(&bo->list);
-		mutex_unlock(&bo->rdev->gem.mutex);
+		sx_xunlock(&bo->rdev->gem.mutex);
 		/* this should unref the ttm bo */
 		drm_gem_object_unreference(&bo->gem_base);
-		mutex_unlock(&rdev->ddev->struct_mutex);
+		DRM_UNLOCK(rdev->ddev);
 	}
 }
 
 int radeon_bo_init(struct radeon_device *rdev)
 {
+#ifdef DUMBBELL_WIP
 	/* Add an MTRR for the VRAM */
 	rdev->mc.vram_mtrr = mtrr_add(rdev->mc.aper_base, rdev->mc.aper_size,
 			MTRR_TYPE_WRCOMB, 1);
-	DRM_INFO("Detected VRAM RAM=%lluM, BAR=%lluM\n",
+#endif /* DUMBBELL_WIP */
+	DRM_INFO("Detected VRAM RAM=%luM, BAR=%lluM\n",
 		rdev->mc.mc_vram_size >> 20,
 		(unsigned long long)rdev->mc.aper_size >> 20);
 	DRM_INFO("RAM width %dbits %cDR\n",
@@ -382,11 +395,13 @@ int radeon_bo_list_validate(struct list_head *head)
 	return 0;
 }
 
+#ifdef DUMBBELL_WIP
 int radeon_bo_fbdev_mmap(struct radeon_bo *bo,
 			     struct vm_area_struct *vma)
 {
 	return ttm_fbdev_mmap(vma, &bo->tbo);
 }
+#endif /* DUMBBELL_WIP */
 
 int radeon_bo_get_surface_reg(struct radeon_bo *bo)
 {
@@ -396,7 +411,8 @@ int radeon_bo_get_surface_reg(struct radeon_bo *bo)
 	int steal;
 	int i;
 
-	BUG_ON(!radeon_bo_is_reserved(bo));
+	KASSERT(radeon_bo_is_reserved(bo),
+	    "radeon_bo_get_surface_reg: radeon_bo is not reserved");
 
 	if (!bo->tiling_flags)
 		return 0;
@@ -522,7 +538,8 @@ void radeon_bo_get_tiling_flags(struct radeon_bo *bo,
 				uint32_t *tiling_flags,
 				uint32_t *pitch)
 {
-	BUG_ON(!radeon_bo_is_reserved(bo));
+	KASSERT(radeon_bo_is_reserved(bo),
+	    "radeon_bo_get_tiling_flags: radeon_bo is not reserved");
 	if (tiling_flags)
 		*tiling_flags = bo->tiling_flags;
 	if (pitch)
@@ -532,7 +549,8 @@ void radeon_bo_get_tiling_flags(struct radeon_bo *bo,
 int radeon_bo_check_tiling(struct radeon_bo *bo, bool has_moved,
 				bool force_drop)
 {
-	BUG_ON(!radeon_bo_is_reserved(bo) && !force_drop);
+	KASSERT((radeon_bo_is_reserved(bo) || force_drop),
+	    "radeon_bo_check_tiling: radeon_bo is not reserved && !force_drop");
 
 	if (!(bo->tiling_flags & RADEON_TILING_SURFACE))
 		return 0;
@@ -606,12 +624,12 @@ int radeon_bo_wait(struct radeon_bo *bo, u32 *mem_type, bool no_wait)
 	r = ttm_bo_reserve(&bo->tbo, true, no_wait, false, 0);
 	if (unlikely(r != 0))
 		return r;
-	spin_lock(&bo->tbo.bdev->fence_lock);
+	DRM_SPINLOCK(&bo->tbo.bdev->fence_lock);
 	if (mem_type)
 		*mem_type = bo->tbo.mem.mem_type;
 	if (bo->tbo.sync_obj)
 		r = ttm_bo_wait(&bo->tbo, true, true, no_wait);
-	spin_unlock(&bo->tbo.bdev->fence_lock);
+	DRM_SPINUNLOCK(&bo->tbo.bdev->fence_lock);
 	ttm_bo_unreserve(&bo->tbo);
 	return r;
 }

@@ -35,32 +35,6 @@ __FBSDID("$FreeBSD$");
 #include "atom.h"
 #include "atom-bits.h"
 
-/* from radeon_encoder.c */
-extern uint32_t
-radeon_get_encoder_enum(struct drm_device *dev, uint32_t supported_device,
-			uint8_t dac);
-extern void radeon_link_encoder_connector(struct drm_device *dev);
-extern void
-radeon_add_atom_encoder(struct drm_device *dev, uint32_t encoder_enum,
-			uint32_t supported_device, u16 caps);
-
-/* from radeon_connector.c */
-extern void
-radeon_add_atom_connector(struct drm_device *dev,
-			  uint32_t connector_id,
-			  uint32_t supported_device,
-			  int connector_type,
-			  struct radeon_i2c_bus_rec *i2c_bus,
-			  uint32_t igp_lane_info,
-			  uint16_t connector_object_id,
-			  struct radeon_hpd *hpd,
-			  struct radeon_router *router);
-
-/* from radeon_legacy_encoder.c */
-extern void
-radeon_add_legacy_encoder(struct drm_device *dev, uint32_t encoder_enum,
-			  uint32_t supported_device);
-
 /* local */
 static int radeon_atom_get_max_vddc(struct radeon_device *rdev, u8 voltage_type,
 				    u16 voltage_id, u16 *voltage);
@@ -213,7 +187,9 @@ void radeon_atombios_i2c_init(struct radeon_device *rdev)
 
 			if (i2c.valid) {
 				sprintf(stmp, "0x%x", i2c.i2c_id);
+#ifdef DUMBBELL_WIP
 				rdev->i2c_bus[i] = radeon_i2c_create(rdev->ddev, &i2c, stmp);
+#endif /* DUMBBELL_WIP */
 			}
 		}
 	}

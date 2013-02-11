@@ -23,8 +23,12 @@
  * Authors: Dave Airlie
  *          Alex Deucher
  */
-#include <drm/drmP.h>
-#include <drm/radeon_drm.h>
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 #include "radeon.h"
 
 #define CURSOR_WIDTH 64
@@ -270,7 +274,9 @@ int radeon_crtc_cursor_move(struct drm_crtc *crtc,
 				cursor_end = x - xorigin + w;
 				if (!(cursor_end & 0x7f)) {
 					x--;
-					WARN_ON_ONCE(x < 0);
+					if (x < 0) {
+						DRM_ERROR("%s: x(%d) < 0", __func__, x);
+					}
 				}
 			}
 		}

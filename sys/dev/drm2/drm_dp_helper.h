@@ -69,8 +69,15 @@
 /* 11b = Other */
 # define DP_FORMAT_CONVERSION               (1 << 3)
 
+ #define DP_TRAINING_AUX_RD_INTERVAL         0x00e
 #define DP_MAIN_LINK_CHANNEL_CODING         0x006
 
+#define	DP_DOWN_STREAM_PORT_COUNT           0x007
+# define DP_PORT_COUNT_MASK                 0x0f
+# define DP_MSA_TIMING_PAR_IGNORED          (1 << 6) /* eDP */
+# define DP_OUI_SUPPORT                     (1 << 7)
+
+#define DP_EDP_CONFIGURATION_CAP            0x00d
 #define DP_TRAINING_AUX_RD_INTERVAL         0x00e
 
 #define DP_PSR_SUPPORT                      0x070
@@ -146,6 +153,8 @@
 #define DP_MAIN_LINK_CHANNEL_CODING_SET	    0x108
 # define DP_SET_ANSI_8B10B		    (1 << 0)
 
+#define DP_EDP_CONFIGURATION_SET            0x10a
+
 #define DP_PSR_EN_CFG			    0x170
 # define DP_PSR_ENABLE			    (1 << 0)
 # define DP_PSR_MAIN_LINK_ACTIVE	    (1 << 1)
@@ -209,6 +218,10 @@
 # define DP_TEST_NAK			    (1 << 1)
 # define DP_TEST_EDID_CHECKSUM_WRITE	    (1 << 2)
 
+#define DP_SOURCE_OUI                       0x300
+#define DP_SINK_OUI                         0x400
+#define DP_BRANCH_OUI                       0x500
+
 #define DP_SET_POWER                        0x600
 # define DP_SET_POWER_D0                    0x1
 # define DP_SET_POWER_D3                    0x2
@@ -228,6 +241,35 @@
 # define DP_PSR_SINK_ACTIVE_RESYNC          4
 # define DP_PSR_SINK_INTERNAL_ERROR         7
 # define DP_PSR_SINK_STATE_MASK             0x07
+
+#define DP_LINK_STATUS_SIZE	   6
+bool drm_dp_channel_eq_ok(u8 link_status[DP_LINK_STATUS_SIZE],
+			  int lane_count);
+bool drm_dp_clock_recovery_ok(u8 link_status[DP_LINK_STATUS_SIZE],
+			      int lane_count);
+u8 drm_dp_get_adjust_request_voltage(u8 link_status[DP_LINK_STATUS_SIZE],
+				     int lane);
+u8 drm_dp_get_adjust_request_pre_emphasis(u8 link_status[DP_LINK_STATUS_SIZE],
+					  int lane);
+
+#define DP_RECEIVER_CAP_SIZE	0xf
+void drm_dp_link_train_clock_recovery_delay(u8 dpcd[DP_RECEIVER_CAP_SIZE]);
+void drm_dp_link_train_channel_eq_delay(u8 dpcd[DP_RECEIVER_CAP_SIZE]);
+
+u8 drm_dp_link_rate_to_bw_code(int link_rate);
+int drm_dp_bw_code_to_link_rate(u8 link_bw);
+
+static inline int
+drm_dp_max_link_rate(u8 dpcd[DP_RECEIVER_CAP_SIZE])
+{
+	return drm_dp_bw_code_to_link_rate(dpcd[DP_MAX_LINK_RATE]);
+}
+
+static inline u8
+drm_dp_max_lane_count(u8 dpcd[DP_RECEIVER_CAP_SIZE])
+{
+	return dpcd[DP_MAX_LANE_COUNT] & DP_MAX_LANE_COUNT_MASK;
+}
 
 #define MODE_I2C_START	1
 #define MODE_I2C_WRITE	2

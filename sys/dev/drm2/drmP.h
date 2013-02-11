@@ -104,6 +104,7 @@ struct drm_file;
 #include <dev/drm2/drm_gem_names.h>
 #include <dev/drm2/drm_mm.h>
 #include <dev/drm2/drm_hashtab.h>
+#include <dev/drm2/drm_sarea.h>
 
 #include "opt_compat.h"
 #include "opt_drm.h"
@@ -328,7 +329,10 @@ typedef int32_t __be32;
 #define DRM_MDELAY(msecs)	do { int loops = (msecs);		\
 	                          while (loops--) DELAY(1000);		\
 				} while (0)
+#define	DRM_MSLEEP(msecs)	drm_msleep((msecs), "drm_msleep")
 #define DRM_TIME_SLICE		(hz/20)  /* Time slice for GLXContexts	  */
+
+#define	drm_can_sleep()	(DRM_HZ & 1)
 
 #define DRM_GET_PRIV_SAREA(_dev, _ctx, _map) do {	\
 	(_map) = (_dev)->context_sareas[_ctx];		\
@@ -417,6 +421,7 @@ typedef struct drm_ioctl_desc {
 	int (*func)(struct drm_device *dev, void *data,
 		    struct drm_file *file_priv);
 	int flags;
+	unsigned int cmd_drv;
 } drm_ioctl_desc_t;
 /**
  * Creates a driver or general drm_ioctl_desc array entry for the given
@@ -424,6 +429,9 @@ typedef struct drm_ioctl_desc {
  */
 #define DRM_IOCTL_DEF(ioctl, func, flags) \
 	[DRM_IOCTL_NR(ioctl)] = {ioctl, func, flags}
+
+#define DRM_IOCTL_DEF_DRV(ioctl, _func, _flags)			\
+	[DRM_IOCTL_NR(DRM_##ioctl)] = {.cmd = DRM_##ioctl, .func = _func, .flags = _flags, .cmd_drv = DRM_IOCTL_##ioctl}
 
 typedef struct drm_magic_entry {
 	drm_magic_t	       magic;
@@ -728,6 +736,31 @@ struct drm_gem_object {
 
 #include "drm_crtc.h"
 
+/* per-master structure */
+struct drm_master {
+
+	u_int refcount; /* refcount for this master */
+
+	struct list_head head; /**< each minor contains a list of masters */
+	struct drm_minor *minor; /**< link back to minor we are a master for */
+
+	char *unique;			/**< Unique identifier: e.g., busid */
+	int unique_len;			/**< Length of unique field */
+	int unique_size;		/**< amount allocated */
+
+	int blocked;			/**< Blocked due to VC switch? */
+
+	/** \name Authentication */
+	/*@{ */
+	struct drm_open_hash magiclist;
+	struct list_head magicfree;
+	/*@} */
+
+	struct drm_lock_data lock;	/**< Information on hardware lock */
+
+	void *driver_priv; /**< Private structure for driver to use */
+};
+
 #ifndef DMA_BIT_MASK
 #define DMA_BIT_MASK(n) (((n) == 64) ? ~0ULL : (1ULL<<(n)) - 1)
 #endif
@@ -736,6 +769,7 @@ struct drm_gem_object {
 
 struct drm_driver_info {
 	int	(*load)(struct drm_device *, unsigned long flags);
+	int	(*use_msi)(struct drm_device *, unsigned long flags);
 	int	(*firstopen)(struct drm_device *);
 	int	(*open)(struct drm_device *, struct drm_file *);
 	void	(*preclose)(struct drm_device *, struct drm_file *file_priv);
@@ -985,7 +1019,13 @@ struct drm_device {
 	void *sysctl_private;
 	char busid_str[128];
 	int modesetting;
+
+	int switch_power_state;
 };
+
+#define DRM_SWITCH_POWER_ON 0
+#define DRM_SWITCH_POWER_OFF 1
+#define DRM_SWITCH_POWER_CHANGING 2
 
 static __inline__ int drm_core_check_feature(struct drm_device *dev,
 					     int feature)
@@ -1512,6 +1552,44 @@ extern int drm_pcie_get_speed_cap_mask(struct drm_device *dev, u32 *speed_mask);
 
 #define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
 #define	hweight32(i)	bitcount32(i)
+
+/* XXXKIB what is the right code for the FreeBSD ? */
+/* kib@ used ENXIO here -- dumbbell@ */
+#define	EREMOTEIO	EIO
+#define	ERESTARTSYS	ERESTART
+
+static inline unsigned long
+roundup_pow_of_two(unsigned long x)
+{
+	return (1UL << flsl(x - 1));
+}
+
+/**
+ * ror32 - rotate a 32-bit value right
+ * @word: value to rotate
+ * @shift: bits to roll
+ *
+ * Source: include/linux/bitops.h
+ */
+static inline uint32_t ror32(uint32_t word, unsigned int shift)
+{
+	return (word >> shift) | (word << (32 - shift));
+}
+
+#define	IS_ALIGNED(x, y)	(((x) & ~((y) - 1)) == 0)
+#define	get_unaligned(ptr)                                              \
+	({ __typeof__(*(ptr)) __tmp;                                    \
+	  memcpy(&__tmp, (ptr), sizeof(*(ptr))); __tmp; })
+
+#define	PCI_VENDOR_ID_APPLE		0x106b
+#define	PCI_VENDOR_ID_ASUSTEK		0x1043
+#define	PCI_VENDOR_ID_ATI		0x1002
+#define	PCI_VENDOR_ID_DELL		0x1028
+#define	PCI_VENDOR_ID_HP		0x103c
+#define	PCI_VENDOR_ID_IBM		0x1014
+#define	PCI_VENDOR_ID_INTEL		0x8086
+#define	PCI_VENDOR_ID_SONY		0x104d
+#define	PCI_VENDOR_ID_VIA		0x1106
 
 #endif /* __KERNEL__ */
 #endif /* _DRM_P_H_ */

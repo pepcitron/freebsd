@@ -23,8 +23,12 @@
  *
  * Authors: Christian König
  */
-#include <drm/drmP.h>
-#include <drm/radeon_drm.h>
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 #include "radeon.h"
 #include "radeon_asic.h"
 #include "r600d.h"
@@ -544,7 +548,7 @@ void r600_hdmi_disable(struct drm_encoder *encoder)
 
 	/* Called for ATOM_ENCODER_MODE_HDMI only */
 	if (!dig || !dig->afmt) {
-		WARN_ON(1);
+		DRM_ERROR("%s: !dig || !dig->afmt", __func__);
 		return;
 	}
 	if (!dig->afmt->enabled)

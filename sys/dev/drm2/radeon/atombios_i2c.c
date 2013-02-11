@@ -28,8 +28,13 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/drm2/drmP.h>
 #include <dev/drm2/radeon/radeon_drm.h>
+#include <dev/iicbus/iic.h>
+#include <dev/iicbus/iiconf.h>
+#include <dev/iicbus/iicbus.h>
 #include "radeon.h"
 #include "atom.h"
+#include "iicbus_if.h"
+#include "iicbb_if.h"
 
 #define TARGET_HW_I2C_CLOCK 50
 
@@ -86,11 +91,11 @@ static int radeon_process_i2c_ch(struct radeon_i2c_chan *chan,
 	return 0;
 }
 
-int radeon_atom_hw_i2c_xfer(struct i2c_adapter *i2c_adap,
-			    struct i2c_msg *msgs, int num)
+static int
+radeon_atom_hw_i2c_xfer(device_t dev, struct iic_msg *msgs, u_int num)
 {
-	struct radeon_i2c_chan *i2c = i2c_get_adapdata(i2c_adap);
-	struct i2c_msg *p;
+	struct radeon_i2c_chan *i2c = device_get_softc(dev);
+	struct iic_msg *p;
 	int i, remaining, current_count, buffer_offset, max_bytes, ret;
 	u8 buf = 0, flags;
 
@@ -98,7 +103,7 @@ int radeon_atom_hw_i2c_xfer(struct i2c_adapter *i2c_adap,
 	p = &msgs[0];
 	if ((num == 1) && (p->len == 0)) {
 		ret = radeon_process_i2c_ch(i2c,
-					    p->addr, HW_I2C_WRITE,
+					    p->slave, HW_I2C_WRITE,
 					    &buf, 1);
 		if (ret)
 			return ret;
@@ -111,7 +116,7 @@ int radeon_atom_hw_i2c_xfer(struct i2c_adapter *i2c_adap,
 		remaining = p->len;
 		buffer_offset = 0;
 		/* max_bytes are a limitation of ProcessI2cChannelTransaction not the hw */
-		if (p->flags & I2C_M_RD) {
+		if (p->flags & IIC_M_RD) {
 			max_bytes = ATOM_MAX_HW_I2C_READ;
 			flags = HW_I2C_READ;
 		} else {
@@ -124,7 +129,7 @@ int radeon_atom_hw_i2c_xfer(struct i2c_adapter *i2c_adap,
 			else
 				current_count = remaining;
 			ret = radeon_process_i2c_ch(i2c,
-						    p->addr, flags,
+						    p->slave, flags,
 						    &p->buf[buffer_offset], current_count);
 			if (ret)
 				return ret;
@@ -136,8 +141,70 @@ int radeon_atom_hw_i2c_xfer(struct i2c_adapter *i2c_adap,
 	return num;
 }
 
-u32 radeon_atom_hw_i2c_func(struct i2c_adapter *adap)
+static int
+radeon_atom_hw_i2c_probe(device_t dev)
 {
-	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
+
+	return (BUS_PROBE_SPECIFIC);
 }
 
+static int
+radeon_atom_hw_i2c_attach(device_t dev)
+{
+	struct radeon_i2c_chan *i2c;
+	device_t iic_dev;
+
+	i2c = device_get_ivars(dev);
+
+	device_set_softc(dev, i2c);
+	device_set_desc(dev, i2c->name);
+
+	/* add generic bit-banging code */
+	iic_dev = device_add_child(dev, "iicbus", -1);
+	if (iic_dev == NULL)
+		return (ENXIO);
+	device_quiet(iic_dev);
+
+	/* attach and probe added child */
+	bus_generic_attach(dev);
+
+	return (0);
+}
+
+static int
+radeon_atom_hw_i2c_detach(device_t dev)
+{
+	/* detach bit-banding code. */
+	bus_generic_detach(dev);
+
+	/* delete bit-banding code. */
+	device_delete_children(dev);
+	return (0);
+}
+
+static int
+radeon_atom_hw_i2c_reset(device_t dev, u_char speed,
+    u_char addr, u_char *oldaddr)
+{
+
+	return (0);
+}
+
+static device_method_t radeon_atom_hw_i2c_methods[] = {
+	DEVMETHOD(device_probe,		radeon_atom_hw_i2c_probe),
+	DEVMETHOD(device_attach,	radeon_atom_hw_i2c_attach),
+	DEVMETHOD(device_detach,	radeon_atom_hw_i2c_detach),
+	DEVMETHOD(iicbus_reset,		radeon_atom_hw_i2c_reset),
+	DEVMETHOD(iicbus_transfer,	radeon_atom_hw_i2c_xfer),
+	DEVMETHOD_END
+};
+
+static driver_t radeon_atom_hw_i2c_driver = {
+	"radeon_atom_hw_i2c",
+	radeon_atom_hw_i2c_methods,
+	0
+};
+
+static devclass_t radeon_atom_hw_i2c_devclass;
+DRIVER_MODULE_ORDERED(radeon_atom_hw_i2c, drmn, radeon_atom_hw_i2c_driver,
+    radeon_atom_hw_i2c_devclass, 0, 0, SI_ORDER_ANY);

@@ -302,7 +302,7 @@ typedef struct drm_radeon_private {
 	int r600_npipes;
 	int r600_nbanks;
 
-	struct mtx cs_mutex;
+	struct sx cs_mutex;
 	u32 cs_id_scnt;
 	u32 cs_id_wcnt;
 	/* r6xx/r7xx drm blit vertex buffer */
@@ -463,13 +463,8 @@ extern void r600_blit_swap(struct drm_device *dev,
 			   int w, int h, int src_pitch, int dst_pitch, int cpp);
 
 /* atpx handler */
-#if defined(CONFIG_VGA_SWITCHEROO)
 void radeon_register_atpx_handler(void);
 void radeon_unregister_atpx_handler(void);
-#else
-static inline void radeon_register_atpx_handler(void) {}
-static inline void radeon_unregister_atpx_handler(void) {}
-#endif
 
 /* Flags for stats.boxes
  */
@@ -2009,7 +2004,7 @@ do {									\
 
 #define VB_AGE_TEST_WITH_RETURN( dev_priv )				\
 do {								\
-	struct drm_radeon_master_private *master_priv = file_priv->master->driver_priv;	\
+	struct drm_radeon_master_private *master_priv = file_priv->masterp->driver_priv;\
 	drm_radeon_sarea_t *sarea_priv = master_priv->sarea_priv;	\
 	if ( sarea_priv->last_dispatch >= RADEON_MAX_VB_AGE ) {		\
 		int __ret;						\

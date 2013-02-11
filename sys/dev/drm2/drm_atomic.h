@@ -102,4 +102,38 @@ atomic_xchg(volatile int *p, int new)
 	return (old);
 }
 
+static __inline long
+atomic64_xchg(volatile long *p, long new)
+{
+	long old;
+
+	old = *p;
+	*p = new;
+
+	return (old);
+}
+
+static __inline int
+atomic_add_return(int i, atomic_t *p)
+{
+
+	atomic_add(i, p);
+	return *p;
+}
+
+static __inline int
+atomic_sub_return(int i, atomic_t *p)
+{
+
+	atomic_sub(i, p);
+	return *p;
+}
+
+#define	atomic_inc_return(v)		atomic_add_return(1, (v))
+#define	atomic_dec_return(v)		atomic_sub_return(1, (v))
+
+#define	atomic_sub_and_test(i, v)	(atomic_sub_return((i), (v)) == 0)
+#define	atomic_dec_and_test(v)		(atomic_dec_return(v) == 0)
+#define	atomic_inc_and_test(v)		(atomic_inc_return(v) == 0)
+
 #define	BITS_TO_LONGS(x) (howmany((x), NBBY * sizeof(long)))

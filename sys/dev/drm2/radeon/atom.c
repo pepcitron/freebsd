@@ -663,14 +663,10 @@ static void atom_op_delay(atom_exec_context *ctx, int *ptr, int arg)
 	SDEBUG("   count: %d\n", count);
 	if (arg == ATOM_UNIT_MICROSEC)
 		DRM_UDELAY(count);
-	else
-		DRM_MDELAY(count);
-#ifdef DUMBBELL_WIP /* See above. */
 	else if (!drm_can_sleep())
 		DRM_MDELAY(count);
 	else
-		msleep(count);
-#endif /* DUMBBELL_WIP */
+		DRM_MSLEEP(count);
 }
 
 static void atom_op_div(atom_exec_context *ctx, int *ptr, int arg)

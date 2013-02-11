@@ -31,13 +31,14 @@
  *    Nicolai Haehnle <prefect_@gmx.net>
  */
 
-#include <drm/drmP.h>
-#include <drm/drm_buffer.h>
-#include <drm/radeon_drm.h>
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
+#include <dev/drm2/drmP.h>
+#include <dev/drm2/drm_buffer.h>
+#include <dev/drm2/radeon/radeon_drm.h>
 #include "radeon_drv.h"
 #include "r300_reg.h"
-
-#include <asm/unaligned.h>
 
 #define R300_SIMULTANEOUS_CLIPRECTS		4
 
@@ -1012,7 +1013,7 @@ int r300_do_cp_cmdbuf(struct drm_device *dev,
 		      drm_radeon_kcmd_buffer_t *cmdbuf)
 {
 	drm_radeon_private_t *dev_priv = dev->dev_private;
-	struct drm_radeon_master_private *master_priv = file_priv->master->driver_priv;
+	struct drm_radeon_master_private *master_priv = file_priv->masterp->driver_priv;
 	struct drm_device_dma *dma = dev->dma;
 	struct drm_buf *buf = NULL;
 	int emit_dispatch_age = 0;
@@ -1119,7 +1120,7 @@ int r300_do_cp_cmdbuf(struct drm_device *dev,
 			}
 
 			emit_dispatch_age = 1;
-			r300_discard_buffer(dev, file_priv->master, buf);
+			r300_discard_buffer(dev, file_priv->masterp, buf);
 			break;
 
 		case R300_CMD_WAIT:

@@ -27,4 +27,4 @@ int radeon_get_vblank_timestamp_kms(struct drm_device *dev, int crtc,
 int radeon_dma_ioctl_kms(struct drm_device *dev, void *data,
 			 struct drm_file *file_priv);
 
-#endif /* !defined(__RADEON__KMS_H__) */
+#endif /* !defined(__RADEON_KMS_H__) */

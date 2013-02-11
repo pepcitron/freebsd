@@ -41,27 +41,6 @@ __FBSDID("$FreeBSD$");
 #include <asm/pci-bridge.h>
 #endif /* CONFIG_PPC_PMAC */
 
-/* from radeon_encoder.c */
-extern uint32_t
-radeon_get_encoder_enum(struct drm_device *dev, uint32_t supported_device,
-			uint8_t dac);
-extern void radeon_link_encoder_connector(struct drm_device *dev);
-
-/* from radeon_connector.c */
-extern void
-radeon_add_legacy_connector(struct drm_device *dev,
-			    uint32_t connector_id,
-			    uint32_t supported_device,
-			    int connector_type,
-			    struct radeon_i2c_bus_rec *i2c_bus,
-			    uint16_t connector_object_id,
-			    struct radeon_hpd *hpd);
-
-/* from radeon_legacy_encoder.c */
-extern void
-radeon_add_legacy_encoder(struct drm_device *dev, uint32_t encoder_enum,
-			  uint32_t supported_device);
-
 /* old legacy ATI BIOS routines */
 
 /* COMBIOS table offsets */
@@ -754,7 +733,9 @@ static struct radeon_i2c_bus_rec radeon_combios_get_i2c_info_from_table(struct r
 
 void radeon_combios_i2c_init(struct radeon_device *rdev)
 {
+#ifdef DUMBBELL_WIP
 	struct drm_device *dev = rdev->ddev;
+#endif /* DUMBBELL_WIP */
 	struct radeon_i2c_bus_rec i2c;
 
 	/* actual hw pads
@@ -770,17 +751,23 @@ void radeon_combios_i2c_init(struct radeon_device *rdev)
 
 	/* 0x60 */
 	i2c = combios_setup_i2c_bus(rdev, DDC_DVI, 0, 0);
+#ifdef DUMBBELL_WIP
 	rdev->i2c_bus[0] = radeon_i2c_create(dev, &i2c, "DVI_DDC");
+#endif /* DUMBBELL_WIP */
 	/* 0x64 */
 	i2c = combios_setup_i2c_bus(rdev, DDC_VGA, 0, 0);
+#ifdef DUMBBELL_WIP
 	rdev->i2c_bus[1] = radeon_i2c_create(dev, &i2c, "VGA_DDC");
+#endif /* DUMBBELL_WIP */
 
 	/* mm i2c */
 	i2c.valid = true;
 	i2c.hw_capable = true;
 	i2c.mm_i2c = true;
 	i2c.i2c_id = 0xa0;
+#ifdef DUMBBELL_WIP
 	rdev->i2c_bus[2] = radeon_i2c_create(dev, &i2c, "MM_I2C");
+#endif /* DUMBBELL_WIP */
 
 	if (rdev->family == CHIP_R300 ||
 	    rdev->family == CHIP_R350) {
@@ -790,24 +777,34 @@ void radeon_combios_i2c_init(struct radeon_device *rdev)
 		   rdev->family == CHIP_RS480) {
 		/* 0x68 */
 		i2c = combios_setup_i2c_bus(rdev, DDC_CRT2, 0, 0);
+#ifdef DUMBBELL_WIP
 		rdev->i2c_bus[3] = radeon_i2c_create(dev, &i2c, "MONID");
+#endif /* DUMBBELL_WIP */
 
 		/* gpiopad */
 		i2c = radeon_combios_get_i2c_info_from_table(rdev);
+#ifdef DUMBBELL_WIP
 		if (i2c.valid)
 			rdev->i2c_bus[4] = radeon_i2c_create(dev, &i2c, "GPIOPAD_MASK");
+#endif /* DUMBBELL_WIP */
 	} else if ((rdev->family == CHIP_R200) ||
 		   (rdev->family >= CHIP_R300)) {
 		/* 0x68 */
 		i2c = combios_setup_i2c_bus(rdev, DDC_MONID, 0, 0);
+#ifdef DUMBBELL_WIP
 		rdev->i2c_bus[3] = radeon_i2c_create(dev, &i2c, "MONID");
+#endif /* DUMBBELL_WIP */
 	} else {
 		/* 0x68 */
 		i2c = combios_setup_i2c_bus(rdev, DDC_MONID, 0, 0);
+#ifdef DUMBBELL_WIP
 		rdev->i2c_bus[3] = radeon_i2c_create(dev, &i2c, "MONID");
+#endif /* DUMBBELL_WIP */
 		/* 0x6c */
 		i2c = combios_setup_i2c_bus(rdev, DDC_CRT2, 0, 0);
+#ifdef DUMBBELL_WIP
 		rdev->i2c_bus[4] = radeon_i2c_create(dev, &i2c, "CRT2_DDC");
+#endif /* DUMBBELL_WIP */
 	}
 }
 

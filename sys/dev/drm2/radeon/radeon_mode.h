@@ -186,17 +186,11 @@ struct radeon_pll {
 };
 
 struct radeon_i2c_chan {
-#ifdef DUMBBELL_WIP
-	struct i2c_adapter adapter;
-#endif /* DUMBBELL_WIP */
+	device_t adapter;
+	device_t iic_bus;
 	struct drm_device *dev;
-#ifdef DUMBBELL_WIP
-	union {
-		struct i2c_algo_bit_data bit;
-		struct i2c_algo_dp_aux_data dp;
-	} algo;
-#endif /* DUMBBELL_WIP */
 	struct radeon_i2c_bus_rec rec;
+	char   name[48];
 };
 
 /* mostly for macs, but really any system without connector tables */
@@ -433,9 +427,7 @@ struct radeon_connector_atom_dig {
 	uint32_t igp_lane_info;
 	/* displayport */
 	struct radeon_i2c_chan *dp_i2c_bus;
-#ifdef DUMBBELL_WIP
 	u8 dpcd[DP_RECEIVER_CAP_SIZE];
-#endif /* DUMBBELL_WIP */
 	u8 dp_sink_type;
 	int dp_clock;
 	int dp_lane_count;
@@ -537,7 +529,7 @@ extern void atombios_dig_transmitter_setup(struct drm_encoder *encoder,
 					   uint8_t lane_set);
 extern void radeon_atom_ext_encoder_setup_ddc(struct drm_encoder *encoder);
 extern struct drm_encoder *radeon_get_external_encoder(struct drm_encoder *encoder);
-extern int radeon_dp_i2c_aux_ch(struct i2c_adapter *adapter, int mode,
+extern int radeon_dp_i2c_aux_ch(device_t dev, int mode,
 				u8 write_byte, u8 *read_byte);
 
 extern void radeon_i2c_init(struct radeon_device *rdev);
