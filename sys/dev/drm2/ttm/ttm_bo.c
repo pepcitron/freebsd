@@ -1418,7 +1418,8 @@ int ttm_bo_global_init(struct drm_global_reference *ref)
 	sx_init(&glob->device_list_mutex, "ttmdlm");
 	mtx_init(&glob->lru_lock, "ttmlru", NULL, MTX_DEF);
 	glob->mem_glob = bo_ref->mem_glob;
-	glob->dummy_read_page = vm_page_alloc_contig(NULL, 0, VM_ALLOC_NORMAL,
+	glob->dummy_read_page = vm_page_alloc_contig(NULL, 0,
+	    VM_ALLOC_NORMAL | VM_ALLOC_NOOBJ,
 	    1, 0, 0xffffffff, 0, 0, VM_MEMATTR_UNCACHEABLE);
 
 	if (unlikely(glob->dummy_read_page == NULL)) {
