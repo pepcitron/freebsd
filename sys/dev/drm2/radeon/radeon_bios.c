@@ -57,7 +57,7 @@ static bool igp_read_bios_from_vram(struct radeon_device *rdev)
 
 	rdev->bios = NULL;
 	vram_base = drm_get_resource_start(rdev->ddev, 0);
-	DRM_INFO("IGP: vram_base=0x%016lx\n", vram_base);
+	DRM_INFO("%s: vram_base=0x%016lx\n", __func__, vram_base);
 
 	bios_map.offset = vram_base;
 	bios_map.size   = size;
@@ -66,15 +66,20 @@ static bool igp_read_bios_from_vram(struct radeon_device *rdev)
 	bios_map.mtrr   = 0;
 	drm_core_ioremap(&bios_map, rdev->ddev);
 	if (bios_map.virtual == NULL) {
-		DRM_INFO("IGP: failed to ioremap\n");
+		DRM_INFO("%s: failed to ioremap\n", __func__);
 		return false;
 	}
 	bios = bios_map.virtual;
 	size = bios_map.size;
-	DRM_INFO("IGP: base=%p, size=%lu\n", bios, size);
+	DRM_INFO("%s: base=%p, size=%lu\n", __func__, bios, size);
 
 	if (size == 0 || bios[0] != 0x55 || bios[1] != 0xaa) {
-		DRM_INFO("IGP: Bad bad BIOS! %02x%02x\n", bios[0], bios[1]);
+		if (size == 0) {
+			DRM_INFO("%s: Incorrect BIOS size\n", __func__);
+		} else {
+			DRM_INFO("%s: Incorrect BIOS signature: 0x%02X%02X\n",
+			    __func__, bios[0], bios[1]);
+		}
 		drm_core_ioremapfree(&bios_map, rdev->ddev);
 		return false;
 	}
@@ -90,60 +95,59 @@ static bool igp_read_bios_from_vram(struct radeon_device *rdev)
 
 static bool radeon_read_bios(struct radeon_device *rdev)
 {
-#ifdef DUMBBELL_WIP
 	struct resource *bios_res;
 	int bios_rid;
 	uint8_t __iomem *bios;
 	size_t size;
-#endif /* DUMBBELL_WIP */
-	pci_addr_t map, testval;
-	int reg;
+	bool found;
 
+	found = false;
 	rdev->bios = NULL;
-	reg = PCIR_BIOS;
-	map = pci_read_config(rdev->dev, reg, 4);
-	pci_write_config(rdev->dev, reg, 0xfffffffe, 4);
-	testval = pci_read_config(rdev->dev, reg, 4);
-	pci_write_config(rdev->dev, reg, map, 4);
-
-	DRM_INFO("bios: %lu %lu\n", map, testval);
-
-#ifdef DUMBBELL_WIP
+	/* XXX: some cards may return 0 for rom size? ddx has a workaround */
 	bios_rid = PCIR_BIOS;
 	bios_res = bus_alloc_resource_any(rdev->dev, SYS_RES_MEMORY,
 	    &bios_rid, rman_make_alignment_flags(4096) | RF_ACTIVE);
 	if (bios_res == NULL) {
-		DRM_INFO("BIOS read: failed to allocate resource\n");
-		return false;
+		/* Shadowed Video VIOS. */
+		DRM_INFO("%s: Shadowed Video BIOS\n", __func__);
+		size = 131072;
+		bios = (uint8_t *)pmap_mapbios(0xC0000, size);
+		if (!bios) {
+			DRM_INFO("%s: failed to map shadowed bios\n", __func__);
+			return false;
+		}
+	} else {
+		bios = (uint8_t *)rman_get_start(bios_res);
+		size = rman_get_size(bios_res);
 	}
-
-	size = rman_get_size(bios_res);
-	DRM_INFO("ROM size: %lu\n", size);
-	bios = NULL;
-
-	bus_release_resource(rdev->dev, SYS_RES_MEMORY, bios_rid, bios_res);
-#endif /* DUMBBELL_WIP */
-	return false;
-
-#ifdef DUMBBELL_WIP
-	/* XXX: some cards may return 0 for rom size? ddx has a workaround */
-	bios = pci_map_rom(rdev->pdev, &size);
-	if (!bios) {
-		return false;
-	}
+	DRM_INFO("%s: start=%p size=%lu bytes\n", __func__, bios, size);
 
 	if (size == 0 || bios[0] != 0x55 || bios[1] != 0xaa) {
-		pci_unmap_rom(rdev->pdev, bios);
-		return false;
+		if (size == 0) {
+			DRM_INFO("%s: Incorrect BIOS size\n", __func__);
+		} else {
+			DRM_INFO("%s: Incorrect BIOS signature: 0x%02X%02X\n",
+			    __func__, bios[0], bios[1]);
+		}
+		goto error;
 	}
-	rdev->bios = kmemdup(bios, size, GFP_KERNEL);
+
+	rdev->bios = malloc(size, DRM_MEM_DRIVER, M_WAITOK);
 	if (rdev->bios == NULL) {
-		pci_unmap_rom(rdev->pdev, bios);
-		return false;
+		goto error;
 	}
-	pci_unmap_rom(rdev->pdev, bios);
-	return true;
-#endif /* DUMBBELL_WIP */
+
+	found = true;
+	memcpy(rdev->bios, bios, size);
+
+error:
+	if (bios_res != NULL) {
+		bus_release_resource(rdev->dev, SYS_RES_MEMORY,
+		    bios_rid, bios_res);
+	} else {
+		pmap_unmapdev((vm_offset_t)bios, size);
+	}
+	return found;
 }
 
 /* ATRM is used to get the BIOS on the discrete cards in
@@ -204,23 +208,24 @@ static bool radeon_atrm_get_bios(struct radeon_device *rdev)
 	bool found = false;
 
 	/* ATRM is for the discrete card only */
-	DRM_INFO("ATRM: IGP?\n");
+	DRM_INFO("%s: IGP?\n", __func__);
 	if (rdev->flags & RADEON_IS_IGP)
 		return false;
 
 #ifdef DUMBBELL_WIP
 	while ((pdev = pci_get_class(PCI_CLASS_DISPLAY_VGA << 8, pdev)) != NULL) {
 #endif /* DUMBBELL_WIP */
-	DRM_INFO("ATRM: pci_find_class\n");
+	DRM_INFO("%s: pci_find_class\n", __func__);
 	if ((dev = pci_find_class(PCIC_DISPLAY, PCIS_DISPLAY_VGA)) != NULL) {
-		DRM_INFO("ATRM: %d:%d:%d:%d, vendor=%04x, device=%04x\n",
+		DRM_INFO("%s: %d:%d:%d:%d, vendor=%04x, device=%04x\n",
+		    __func__,
 		    pci_get_domain(dev),
 		    pci_get_bus(dev),
 		    pci_get_slot(dev),
 		    pci_get_function(dev),
 		    pci_get_vendor(dev),
 		    pci_get_device(dev));
-		DRM_INFO("ATRM: acpi_get_handle\n");
+		DRM_INFO("%s: acpi_get_handle\n", __func__);
 		dhandle = acpi_get_handle(dev);
 #ifdef DUMBBELL_WIP
 		if (!dhandle)
@@ -229,7 +234,7 @@ static bool radeon_atrm_get_bios(struct radeon_device *rdev)
 		if (!dhandle)
 			return false;
 
-		DRM_INFO("ATRM: AcpiGetHandle\n");
+		DRM_INFO("%s: AcpiGetHandle\n", __func__);
 		status = AcpiGetHandle(dhandle, "ATRM", &atrm_handle);
 		if (!ACPI_FAILURE(status)) {
 			found = true;
@@ -237,14 +242,14 @@ static bool radeon_atrm_get_bios(struct radeon_device *rdev)
 			break;
 #endif /* DUMBBELL_WIP */
 		} else {
-			DRM_INFO("ATRM: ACPI_FAILURE: %s\n", AcpiFormatException(status));
+			DRM_INFO("%s: ACPI_FAILURE: %s\n",
+			    __func__, AcpiFormatException(status));
 		}
 	}
 
 	if (!found)
 		return false;
 
-	DRM_INFO("ATRM: Alloc BIOS\n");
 	rdev->bios = malloc(size, DRM_MEM_DRIVER, M_WAITOK);
 	if (!rdev->bios) {
 		DRM_ERROR("Unable to allocate bios\n");
@@ -252,7 +257,7 @@ static bool radeon_atrm_get_bios(struct radeon_device *rdev)
 	}
 
 	for (i = 0; i < size / ATRM_BIOS_PAGE; i++) {
-		DRM_INFO("ATRM: radeon_atrm_call\n");
+		DRM_INFO("%s: radeon_atrm_call\n", __func__);
 		ret = radeon_atrm_call(atrm_handle,
 				       rdev->bios,
 				       (i * ATRM_BIOS_PAGE),
@@ -262,7 +267,12 @@ static bool radeon_atrm_get_bios(struct radeon_device *rdev)
 	}
 
 	if (i == 0 || rdev->bios[0] != 0x55 || rdev->bios[1] != 0xaa) {
-		DRM_INFO("ATRM: bad BIOS\n");
+		if (i == 0) {
+			DRM_INFO("%s: Incorrect BIOS size\n", __func__);
+		} else {
+			DRM_INFO("%s: Incorrect BIOS signature: 0x%02X%02X\n",
+			    __func__, rdev->bios[0], rdev->bios[1]);
+		}
 		free(rdev->bios, DRM_MEM_DRIVER);
 		return false;
 	}
@@ -677,22 +687,22 @@ bool radeon_get_bios(struct radeon_device *rdev)
 	bool r;
 	uint16_t tmp;
 
-	DRM_INFO("Get BIOS: ATRM\n");
+	DRM_INFO("%s: ATRM\n", __func__);
 	r = radeon_atrm_get_bios(rdev);
 	if (r == false) {
-		DRM_INFO("Get BIOS: VFCT\n");
+		DRM_INFO("%s: VFCT\n", __func__);
 		r = radeon_acpi_vfct_bios(rdev);
 	}
 	if (r == false) {
-		DRM_INFO("Get BIOS: IGP\n");
+		DRM_INFO("%s: IGP\n", __func__);
 		r = igp_read_bios_from_vram(rdev);
 	}
 	if (r == false) {
-		DRM_INFO("Get BIOS: read (not implemented)\n");
+		DRM_INFO("%s: read BIOS\n", __func__);
 		r = radeon_read_bios(rdev);
 	}
 	if (r == false) {
-		DRM_INFO("Get BIOS: read disabled (not implemented)\n");
+		DRM_INFO("%s: read disabled BIOS\n", __func__);
 		r = radeon_read_disabled_bios(rdev);
 	}
 	if (r == false || rdev->bios == NULL) {
