@@ -40,6 +40,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysent.h>
 #include <dev/drm2/drmP.h>
 #include <dev/drm2/drm.h>
+#include <dev/drm2/drm_core.h>
+#include <dev/drm2/drm_global.h>
 #include <dev/drm2/drm_sarea.h>
 #include <dev/drm2/drm_mode.h>
 
@@ -1015,11 +1017,6 @@ static linux_ioctl_function_t drm_linux_ioctl;
 static struct linux_ioctl_handler drm_handler = {drm_linux_ioctl, 
     LINUX_IOCTL_DRM_MIN, LINUX_IOCTL_DRM_MAX};
 
-SYSINIT(drm_register, SI_SUB_KLD, SI_ORDER_MIDDLE, 
-    linux_ioctl_register_handler, &drm_handler);
-SYSUNINIT(drm_unregister, SI_SUB_KLD, SI_ORDER_MIDDLE, 
-    linux_ioctl_unregister_handler, &drm_handler);
-
 /* The bits for in/out are switched on Linux */
 #define LINUX_IOC_IN	IOC_OUT
 #define LINUX_IOC_OUT	IOC_IN
@@ -1041,6 +1038,38 @@ drm_linux_ioctl(DRM_STRUCTPROC *p, struct linux_ioctl_args* args)
 	return error;
 }
 #endif /* DRM_LINUX */
+
+
+static int
+drm_core_init(void *arg)
+{
+
+	drm_global_init();
+
+#if DRM_LINUX
+	linux_ioctl_register_handler(&drm_handler);
+#endif /* DRM_LINUX */
+
+	DRM_INFO("Initialized %s %d.%d.%d %s\n",
+		 CORE_NAME, CORE_MAJOR, CORE_MINOR, CORE_PATCHLEVEL, CORE_DATE);
+	return 0;
+}
+
+static void
+drm_core_exit(void *arg)
+{
+
+#if DRM_LINUX
+	linux_ioctl_unregister_handler(&drm_handler);
+#endif /* DRM_LINUX */
+
+	drm_global_release();
+}
+
+SYSINIT(drm_register, SI_SUB_KLD, SI_ORDER_MIDDLE,
+    drm_core_init, NULL);
+SYSUNINIT(drm_unregister, SI_SUB_KLD, SI_ORDER_MIDDLE,
+    drm_core_exit, NULL);
 
 bool
 dmi_check_system(const struct dmi_system_id *sysid)

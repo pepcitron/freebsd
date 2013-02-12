@@ -55,14 +55,14 @@ void drm_global_init(void)
 
 void drm_global_release(void)
 {
-#ifdef INVARIANTS
 	int i;
+
 	for (i = 0; i < DRM_GLOBAL_NUM; ++i) {
 		struct drm_global_item *item = &glob[i];
 		MPASS(item->object == NULL);
 		MPASS(item->refcount == 0);
+		sx_destroy(&item->mutex);
 	}
-#endif
 }
 
 int drm_global_item_ref(struct drm_global_reference *ref)
