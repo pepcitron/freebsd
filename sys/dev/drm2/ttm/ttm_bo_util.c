@@ -395,7 +395,7 @@ static int ttm_buffer_object_transfer(struct ttm_buffer_object *bo,
 	struct ttm_bo_device *bdev = bo->bdev;
 	struct ttm_bo_driver *driver = bdev->driver;
 
-	fbo = malloc(sizeof(*fbo), M_TTM_TRANSF_OBJ, M_WAITOK);
+	fbo = malloc(sizeof(*fbo), M_TTM_TRANSF_OBJ, M_ZERO | M_WAITOK);
 	*fbo = *bo;
 
 	/**

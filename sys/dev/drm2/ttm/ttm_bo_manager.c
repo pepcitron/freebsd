@@ -105,7 +105,7 @@ static int ttm_bo_man_init(struct ttm_mem_type_manager *man,
 	struct ttm_range_manager *rman;
 	int ret;
 
-	rman = malloc(sizeof(*rman), M_TTM_RMAN, M_WAITOK);
+	rman = malloc(sizeof(*rman), M_TTM_RMAN, M_ZERO | M_WAITOK);
 	ret = drm_mm_init(&rman->mm, 0, p_size);
 	if (ret) {
 		free(rman, M_TTM_RMAN);
