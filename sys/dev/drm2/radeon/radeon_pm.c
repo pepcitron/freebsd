@@ -249,7 +249,7 @@ static void radeon_pm_set_clocks(struct radeon_device *rdev)
 		return;
 
 	sx_xlock(&rdev->ddev->dev_struct_lock);
-	rw_wlock(&rdev->pm.mclk_lock);
+	sx_xlock(&rdev->pm.mclk_lock);
 	sx_xlock(&rdev->ring_lock);
 
 	/* wait for the rings to drain */
@@ -262,7 +262,7 @@ static void radeon_pm_set_clocks(struct radeon_device *rdev)
 		if (r) {
 			/* needs a GPU reset dont reset here */
 			sx_xunlock(&rdev->ring_lock);
-			rw_wunlock(&rdev->pm.mclk_lock);
+			sx_xunlock(&rdev->pm.mclk_lock);
 			sx_xunlock(&rdev->ddev->dev_struct_lock);
 			return;
 		}
@@ -298,7 +298,7 @@ static void radeon_pm_set_clocks(struct radeon_device *rdev)
 	rdev->pm.dynpm_planned_action = DYNPM_ACTION_NONE;
 
 	sx_xunlock(&rdev->ring_lock);
-	rw_wunlock(&rdev->pm.mclk_lock);
+	sx_xunlock(&rdev->pm.mclk_lock);
 	sx_xunlock(&rdev->ddev->dev_struct_lock);
 }
 

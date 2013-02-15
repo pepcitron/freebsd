@@ -1038,7 +1038,7 @@ int radeon_device_init(struct radeon_device *rdev,
 	sx_init(&rdev->gem.mutex, "drm__radeon_device__gem__mutex");
 	sx_init(&rdev->pm.mutex, "drm__radeon_device__pm__mutex");
 	sx_init(&rdev->gpu_clock_mutex, "drm__radeon_device__gpu_clock_mutex");
-	rw_init(&rdev->pm.mclk_lock, "drm__radeon_device__pm__mclk_lock");
+	sx_init(&rdev->pm.mclk_lock, "drm__radeon_device__pm__mclk_lock");
 	rw_init(&rdev->exclusive_lock, "drm__radeon_device__exclusive_lock");
 	DRM_INIT_WAITQUEUE(&rdev->irq.vblank_queue);
 	r = radeon_gem_init(rdev);

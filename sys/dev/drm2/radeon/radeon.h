@@ -1065,7 +1065,7 @@ struct radeon_power_state {
 struct radeon_pm {
 	struct sx		mutex;
 	/* write locked while reprogramming mclk */
-	struct rwlock		mclk_lock;
+	struct sx		mclk_lock;
 	u32			active_crtcs;
 	int			active_crtc_count;
 	int			req_vblank;
