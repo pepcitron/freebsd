@@ -250,7 +250,7 @@ void ttm_bo_list_ref_sub(struct ttm_buffer_object *bo, int count,
 	u_int old;
 
 	old = atomic_fetchadd_int(&bo->list_kref, -count);
-	if (old == 1) {
+	if (old <= count) {
 		if (never_free)
 			panic("ttm_bo_ref_buf");
 		ttm_bo_release_list(bo);
