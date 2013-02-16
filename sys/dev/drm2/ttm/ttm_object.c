@@ -156,7 +156,7 @@ int ttm_base_object_init(struct ttm_object_file *tfile,
 	base->refcount_release = rcount_release;
 	base->ref_obj_release = ref_obj_release;
 	base->object_type = object_type;
-	refcount_init(&base->refcount, 0);
+	refcount_init(&base->refcount, 1);
 	rw_init(&tdev->object_lock, "ttmbao");
 	rw_wlock(&tdev->object_lock);
 	ret = drm_ht_just_insert_please(&tdev->object_hash,
@@ -289,7 +289,7 @@ int ttm_ref_object_add(struct ttm_object_file *tfile,
 		ref->obj = base;
 		ref->tfile = tfile;
 		ref->ref_type = ref_type;
-		refcount_init(&ref->kref, 0);
+		refcount_init(&ref->kref, 1);
 
 		rw_wlock(&tfile->lock);
 		ret = drm_ht_insert_item(ht, &ref->hash);
@@ -394,7 +394,7 @@ struct ttm_object_file *ttm_object_file_init(struct ttm_object_device *tdev,
 	tfile = malloc(sizeof(*tfile), M_TTM_OBJ_FILE, M_WAITOK);
 	rw_init(&tfile->lock, "ttmfo");
 	tfile->tdev = tdev;
-	refcount_init(&tfile->refcount, 0);
+	refcount_init(&tfile->refcount, 1);
 	INIT_LIST_HEAD(&tfile->ref_list);
 
 	for (i = 0; i < TTM_REF_NUM; ++i) {

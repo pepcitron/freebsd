@@ -411,8 +411,8 @@ static int ttm_buffer_object_transfer(struct ttm_buffer_object *bo,
 	atomic_set(&fbo->cpu_writers, 0);
 
 	fbo->sync_obj = driver->sync_obj_ref(bo->sync_obj);
-	refcount_init(&fbo->list_kref, 0);
-	refcount_init(&fbo->kref, 0);
+	refcount_init(&fbo->list_kref, 1);
+	refcount_init(&fbo->kref, 1);
 	fbo->destroy = &ttm_transfered_destroy;
 	fbo->acc_size = 0;
 

@@ -1176,8 +1176,8 @@ int ttm_bo_init(struct ttm_bo_device *bdev,
 	}
 	bo->destroy = destroy;
 
-	refcount_init(&bo->kref, 0);
-	refcount_init(&bo->list_kref, 0);
+	refcount_init(&bo->kref, 1);
+	refcount_init(&bo->list_kref, 1);
 	atomic_set(&bo->cpu_writers, 0);
 	atomic_set(&bo->reserved, 1);
 	INIT_LIST_HEAD(&bo->lru);
