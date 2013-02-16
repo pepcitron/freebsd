@@ -1148,7 +1148,7 @@ struct radeon_i2c_chan *radeon_i2c_create(struct drm_device *dev,
 			goto out_free;
 		}
 
-		i2c->adapter = device_find_child(iicbus_dev, "iicbus", -1);
+		i2c->adapter = device_find_child(icbb_dev, "iicbus", -1);
 		if (i2c->adapter == NULL) {
 			DRM_ERROR(
 			    "bbbus bridge doesn't have iicbus grandchild\n");
