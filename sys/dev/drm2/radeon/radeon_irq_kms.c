@@ -261,7 +261,9 @@ int radeon_irq_kms_init(struct radeon_device *rdev)
 	rdev->msi_enabled = rdev->ddev->msi_enabled;
 
 	rdev->irq.installed = true;
+	DRM_UNLOCK(rdev->ddev);
 	r = drm_irq_install(rdev->ddev);
+	DRM_LOCK(rdev->ddev);
 	if (r) {
 		rdev->irq.installed = false;
 		return r;
