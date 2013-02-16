@@ -97,6 +97,7 @@ static bool radeon_read_bios(struct radeon_device *rdev)
 {
 	struct resource *bios_res;
 	int bios_rid;
+	device_t vga;
 	uint8_t __iomem *bios;
 	size_t size;
 	bool found;
@@ -105,9 +106,34 @@ static bool radeon_read_bios(struct radeon_device *rdev)
 	rdev->bios = NULL;
 	/* XXX: some cards may return 0 for rom size? ddx has a workaround */
 	bios_rid = PCIR_BIOS;
-	bios_res = bus_alloc_resource_any(rdev->dev, SYS_RES_MEMORY,
-	    &bios_rid, rman_make_alignment_flags(4096) | RF_ACTIVE);
-	if (bios_res == NULL) {
+
+	/*
+	 * Get the size of the Expansion ROM by setting the 21
+	 * highest-order bits to 1.
+	 */
+	pci_write_config(rdev->dev, bios_rid, 0xfffff800, 4);
+	size = pci_read_config(rdev->dev, bios_rid, 4);
+	size &= 0xfffff800;
+	size = size & (~size + 1);
+	DRM_INFO("%s: size (read from BAR): %lu bytes\n", __func__, size);
+
+	/* Allocate the Expansion ROM from the grand-father device. */
+	vga = device_get_parent(rdev->dev);
+	bios_res = BUS_ALLOC_RESOURCE(device_get_parent(vga), rdev->dev,
+	    SYS_RES_MEMORY, &bios_rid, 0, ~0, size, RF_ACTIVE);
+
+	if (bios_res != NULL) {
+		/*
+		 * We now have the physical address: we must write it to
+		 * the Expansion ROM BAR and enable it.
+		 */
+		uint32_t start = rman_get_start(bios_res);
+		DRM_INFO("%s: Expansion ROM mapped\n", __func__);
+		pci_write_config(rdev->dev, bios_rid, start | 0x1, 4);
+
+		bios = rman_get_virtual(bios_res);
+		size = rman_get_size(bios_res);
+	} else {
 		/* Shadowed Video VIOS. */
 		DRM_INFO("%s: Shadowed Video BIOS\n", __func__);
 		size = 131072;
@@ -116,9 +142,6 @@ static bool radeon_read_bios(struct radeon_device *rdev)
 			DRM_INFO("%s: failed to map shadowed bios\n", __func__);
 			return false;
 		}
-	} else {
-		bios = (uint8_t *)rman_get_start(bios_res);
-		size = rman_get_size(bios_res);
 	}
 	DRM_INFO("%s: start=%p size=%lu bytes\n", __func__, bios, size);
 
@@ -142,7 +165,9 @@ static bool radeon_read_bios(struct radeon_device *rdev)
 
 error:
 	if (bios_res != NULL) {
-		bus_release_resource(rdev->dev, SYS_RES_MEMORY,
+		BUS_DEACTIVATE_RESOURCE(device_get_parent(vga), rdev->dev, SYS_RES_MEMORY,
+		    bios_rid, bios_res);
+		BUS_RELEASE_RESOURCE(device_get_parent(vga), rdev->dev, SYS_RES_MEMORY,
 		    bios_rid, bios_res);
 	} else {
 		pmap_unmapdev((vm_offset_t)bios, size);
