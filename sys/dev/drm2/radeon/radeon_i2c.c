@@ -244,9 +244,7 @@ radeon_iicbb_attach(device_t dev)
 	struct radeon_i2c_chan *i2c;
 	device_t iic_dev;
 
-	i2c = device_get_ivars(dev);
-
-	device_set_softc(dev, i2c);
+	i2c = device_get_softc(dev);
 	device_set_desc(dev, i2c->name);
 
 	/* add generic bit-banging code */
@@ -975,9 +973,7 @@ radeon_hw_i2c_attach(device_t dev)
 	struct radeon_i2c_chan *i2c;
 	device_t iic_dev;
 
-	i2c = device_get_ivars(dev);
-
-	device_set_softc(dev, i2c);
+	i2c = device_get_softc(dev);
 	device_set_desc(dev, i2c->name);
 
 	/* add generic bit-banging code */
@@ -1067,13 +1063,14 @@ struct radeon_i2c_chan *radeon_i2c_create(struct drm_device *dev,
 		/* set the radeon hw i2c adapter */
 		snprintf(i2c->name, sizeof(i2c->name),
 			 "Radeon i2c hw bus %s", name);
-		iicbus_dev = device_add_child(dev->device, "radeon_i2c_hw", -1);
+		iicbus_dev = device_add_child(dev->device, "radeon_hw_i2c", -1);
 		if (iicbus_dev == NULL) {
 			DRM_ERROR("Failed to create bridge for hw i2c %s\n",
 			    name);
 			goto out_free;
 		}
 		device_quiet(iicbus_dev);
+		device_set_softc(iicbus_dev, i2c);
 
 		ret = device_probe_and_attach(iicbus_dev);
 		if (ret != 0) {
@@ -1103,6 +1100,7 @@ struct radeon_i2c_chan *radeon_i2c_create(struct drm_device *dev,
 			goto out_free;
 		}
 		device_quiet(iicbus_dev);
+		device_set_softc(iicbus_dev, i2c);
 
 		ret = device_probe_and_attach(iicbus_dev);
 		if (ret != 0) {
@@ -1132,6 +1130,7 @@ struct radeon_i2c_chan *radeon_i2c_create(struct drm_device *dev,
 			goto out_free;
 		}
 		device_quiet(iicbus_dev);
+		device_set_softc(iicbus_dev, i2c);
 
 		ret = device_probe_and_attach(iicbus_dev);
 		if (ret != 0) {

@@ -154,9 +154,7 @@ radeon_atom_hw_i2c_attach(device_t dev)
 	struct radeon_i2c_chan *i2c;
 	device_t iic_dev;
 
-	i2c = device_get_ivars(dev);
-
-	device_set_softc(dev, i2c);
+	i2c = device_get_softc(dev);
 	device_set_desc(dev, i2c->name);
 
 	/* add generic bit-banging code */
