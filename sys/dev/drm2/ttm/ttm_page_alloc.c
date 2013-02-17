@@ -468,9 +468,10 @@ static int ttm_alloc_new_pages(struct pglist *pages, int vm_alloc_flags,
 	    M_WAITOK | M_ZERO);
 
 	for (i = 0, cpages = 0; i < count; ++i) {
-		p = vm_page_alloc_contig(NULL, 0, vm_alloc_flags, 1, 0,
-		    (vm_alloc_flags & VM_ALLOC_DMA32) ? 0xffffffff : 0,
-		    0, 0, ttm_caching_state_to_vm(cstate));
+		p = vm_page_alloc_contig(NULL, 0,
+		    vm_alloc_flags | VM_ALLOC_NOOBJ, 1, 0,
+		    (vm_alloc_flags & VM_ALLOC_DMA32) ? 0xffffffff : VM_MAX_ADDRESS,
+		    PAGE_SIZE, 0, ttm_caching_state_to_vm(cstate));
 		if (!p) {
 			printf("[TTM] Unable to get page %u\n", i);
 
@@ -668,7 +669,7 @@ static int ttm_get_pages(vm_page_t *pages, unsigned npages, int flags,
 	struct ttm_page_pool *pool = ttm_get_pool(flags, cstate);
 	struct pglist plist;
 	vm_page_t p = NULL;
-	int vm_alloc_flags = VM_ALLOC_NORMAL | VM_ALLOC_NOBUSY;
+	int vm_alloc_flags = VM_ALLOC_NORMAL | VM_ALLOC_NOBUSY | VM_ALLOC_NOOBJ;
 	unsigned count;
 	int r;
 
@@ -680,8 +681,8 @@ static int ttm_get_pages(vm_page_t *pages, unsigned npages, int flags,
 	if (pool == NULL) {
 		for (r = 0; r < npages; ++r) {
 			p = vm_page_alloc_contig(NULL, 0, vm_alloc_flags, 1, 0,
-			    (flags & TTM_PAGE_FLAG_DMA32) ? 0xffffffff : 0,
-			    0, 0, ttm_caching_state_to_vm(cstate));
+			    (flags & TTM_PAGE_FLAG_DMA32) ? 0xffffffff : VM_MAX_ADDRESS,
+			    PAGE_SIZE, 0, ttm_caching_state_to_vm(cstate));
 			if (!p) {
 				printf("[TTM] Unable to allocate page\n");
 				return -ENOMEM;
