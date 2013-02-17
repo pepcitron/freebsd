@@ -542,21 +542,13 @@ bool radeon_boot_test_post_card(struct radeon_device *rdev)
  */
 int radeon_dummy_page_init(struct radeon_device *rdev)
 {
-	if (rdev->dummy_page.page)
+	if (rdev->dummy_page.dmah)
 		return 0;
-#ifdef DUMBBELL_WIP
-	rdev->dummy_page.page = alloc_page(GFP_DMA32 | GFP_KERNEL | __GFP_ZERO);
-	if (rdev->dummy_page.page == NULL)
+	rdev->dummy_page.dmah = drm_pci_alloc(rdev->ddev,
+	    PAGE_SIZE, PAGE_SIZE, ~0);
+	if (rdev->dummy_page.dmah == NULL)
 		return -ENOMEM;
-	rdev->dummy_page.addr = pci_map_page(rdev->pdev, rdev->dummy_page.page,
-					0, PAGE_SIZE, PCI_DMA_BIDIRECTIONAL);
-	if (pci_dma_mapping_error(rdev->pdev, rdev->dummy_page.addr)) {
-		dev_err(rdev->dev, "Failed to DMA MAP the dummy page\n");
-		__free_page(rdev->dummy_page.page);
-		rdev->dummy_page.page = NULL;
-		return -ENOMEM;
-	}
-#endif /* DUMBBELL_WIP */
+	rdev->dummy_page.addr = (dma_addr_t)rdev->dummy_page.dmah->vaddr;
 	return 0;
 }
 
@@ -569,14 +561,11 @@ int radeon_dummy_page_init(struct radeon_device *rdev)
  */
 void radeon_dummy_page_fini(struct radeon_device *rdev)
 {
-	if (rdev->dummy_page.page == NULL)
+	if (rdev->dummy_page.dmah == NULL)
 		return;
-#ifdef DUMBBELL_WIP
-	pci_unmap_page(rdev->pdev, rdev->dummy_page.addr,
-			PAGE_SIZE, PCI_DMA_BIDIRECTIONAL);
-	__free_page(rdev->dummy_page.page);
-	rdev->dummy_page.page = NULL;
-#endif /* DUMBBELL_WIP */
+	drm_pci_free(rdev->ddev, rdev->dummy_page.dmah);
+	rdev->dummy_page.dmah = NULL;
+	rdev->dummy_page.addr = 0;
 }
 
 
