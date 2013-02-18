@@ -5,6 +5,7 @@
 SUBDIR = \
 	drm2 \
 	i915kms \
-	radeonkms
+	radeonkms \
+	radeonkmsfw
 
 .include <bsd.subdir.mk>

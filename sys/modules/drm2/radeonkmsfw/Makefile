@@ -1,0 +1,63 @@
+# $FreeBSD$
+
+SUBDIR=									\
+	ARUBA_me							\
+	ARUBA_pfp							\
+	ARUBA_rlc							\
+	BARTS_mc							\
+	BARTS_me							\
+	BARTS_pfp							\
+	BTC_rlc								\
+	CAICOS_mc							\
+	CAICOS_me							\
+	CAICOS_pfp							\
+	CAYMAN_mc							\
+	CAYMAN_me							\
+	CAYMAN_pfp							\
+	CAYMAN_rlc							\
+	CEDAR_me							\
+	CEDAR_pfp							\
+	CEDAR_rlc							\
+	CYPRESS_me							\
+	CYPRESS_pfp							\
+	CYPRESS_rlc							\
+	JUNIPER_me							\
+	JUNIPER_pfp							\
+	JUNIPER_rlc							\
+	OLAND_ce							\
+	OLAND_mc							\
+	OLAND_me							\
+	OLAND_pfp							\
+	OLAND_rlc							\
+	PALM_me								\
+	PALM_pfp							\
+	PITCAIRN_ce							\
+	PITCAIRN_mc							\
+	PITCAIRN_me							\
+	PITCAIRN_pfp							\
+	PITCAIRN_rlc							\
+	R600_rlc							\
+	R700_rlc							\
+	REDWOOD_me							\
+	REDWOOD_pfp							\
+	REDWOOD_rlc							\
+	SUMO2_me							\
+	SUMO2_pfp							\
+	SUMO_me								\
+	SUMO_pfp							\
+	SUMO_rlc							\
+	TAHITI_ce							\
+	TAHITI_mc							\
+	TAHITI_me							\
+	TAHITI_pfp							\
+	TAHITI_rlc							\
+	TURKS_mc							\
+	TURKS_me							\
+	TURKS_pfp							\
+	VERDE_ce							\
+	VERDE_mc							\
+	VERDE_me							\
+	VERDE_pfp							\
+	VERDE_rlc
+
+.include <bsd.subdir.mk>
