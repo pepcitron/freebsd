@@ -37,7 +37,6 @@ __FBSDID("$FreeBSD$");
 /* Test BO GTT->VRAM and VRAM->GTT GPU copies across the whole GTT aperture */
 static void radeon_do_test_moves(struct radeon_device *rdev, int flag)
 {
-#ifdef DUMBBELL_WIP
 	struct radeon_bo *vram_obj = NULL;
 	struct radeon_bo **gtt_obj = NULL;
 	struct radeon_fence *fence = NULL;
@@ -119,7 +118,7 @@ static void radeon_do_test_moves(struct radeon_device *rdev, int flag)
 			goto out_cleanup;
 		}
 
-		for (gtt_start = gtt_map, gtt_end = gtt_map + size;
+		for (gtt_start = gtt_map, gtt_end = (void *)((uintptr_t)gtt_map + size);
 		     gtt_start < gtt_end;
 		     gtt_start++)
 			*gtt_start = gtt_start;
@@ -149,8 +148,8 @@ static void radeon_do_test_moves(struct radeon_device *rdev, int flag)
 			goto out_cleanup;
 		}
 
-		for (gtt_start = gtt_map, gtt_end = gtt_map + size,
-		     vram_start = vram_map, vram_end = vram_map + size;
+		for (gtt_start = gtt_map, gtt_end = (void *)((uintptr_t)gtt_map + size),
+		     vram_start = vram_map, vram_end = (void *)((uintptr_t)vram_map + size);
 		     vram_start < vram_end;
 		     gtt_start++, vram_start++) {
 			if (*vram_start != gtt_start) {
@@ -159,11 +158,11 @@ static void radeon_do_test_moves(struct radeon_device *rdev, int flag)
 					  "0x%16llx/0x%16llx)\n",
 					  i, *vram_start, gtt_start,
 					  (unsigned long long)
-					  (gtt_addr - rdev->mc.gtt_start +
-					   (void*)gtt_start - gtt_map),
+					  ((uintptr_t)gtt_addr - (uintptr_t)rdev->mc.gtt_start +
+					   (uintptr_t)gtt_start - (uintptr_t)gtt_map),
 					  (unsigned long long)
-					  (vram_addr - rdev->mc.vram_start +
-					   (void*)gtt_start - gtt_map));
+					  ((uintptr_t)vram_addr - (uintptr_t)rdev->mc.vram_start +
+					   (uintptr_t)gtt_start - (uintptr_t)gtt_map));
 				radeon_bo_kunmap(vram_obj);
 				goto out_cleanup;
 			}
@@ -195,8 +194,8 @@ static void radeon_do_test_moves(struct radeon_device *rdev, int flag)
 			goto out_cleanup;
 		}
 
-		for (gtt_start = gtt_map, gtt_end = gtt_map + size,
-		     vram_start = vram_map, vram_end = vram_map + size;
+		for (gtt_start = gtt_map, gtt_end = (void *)((uintptr_t)gtt_map + size),
+		     vram_start = vram_map, vram_end = (void *)((uintptr_t)vram_map + size);
 		     gtt_start < gtt_end;
 		     gtt_start++, vram_start++) {
 			if (*gtt_start != vram_start) {
@@ -205,11 +204,11 @@ static void radeon_do_test_moves(struct radeon_device *rdev, int flag)
 					  "0x%16llx/0x%16llx)\n",
 					  i, *gtt_start, vram_start,
 					  (unsigned long long)
-					  (vram_addr - rdev->mc.vram_start +
-					   (void*)vram_start - vram_map),
+					  ((uintptr_t)vram_addr - (uintptr_t)rdev->mc.vram_start +
+					   (uintptr_t)vram_start - (uintptr_t)vram_map),
 					  (unsigned long long)
-					  (gtt_addr - rdev->mc.gtt_start +
-					   (void*)vram_start - vram_map));
+					  ((uintptr_t)gtt_addr - (uintptr_t)rdev->mc.gtt_start +
+					   (uintptr_t)vram_start - (uintptr_t)vram_map));
 				radeon_bo_kunmap(gtt_obj[i]);
 				goto out_cleanup;
 			}
@@ -217,7 +216,7 @@ static void radeon_do_test_moves(struct radeon_device *rdev, int flag)
 
 		radeon_bo_kunmap(gtt_obj[i]);
 
-		DRM_INFO("Tested GTT->VRAM and VRAM->GTT copy for GTT offset 0x%llx\n",
+		DRM_INFO("Tested GTT->VRAM and VRAM->GTT copy for GTT offset 0x%lx\n",
 			 gtt_addr - rdev->mc.gtt_start);
 	}
 
@@ -247,7 +246,6 @@ out_cleanup:
 	if (r) {
 		DRM_ERROR("Error while testing BO move.\n");
 	}
-#endif /* DUMBBELL_WIP */
 }
 
 void radeon_test_moves(struct radeon_device *rdev)
