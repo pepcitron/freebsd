@@ -240,7 +240,7 @@ static int ttm_mem_init_dma32_zone(struct ttm_mem_global *glob,
 	zone->used_mem = 0;
 	zone->glob = glob;
 	glob->zone_dma32 = zone;
-	refcount_init(&zone->kobj_ref, 0);
+	refcount_init(&zone->kobj_ref, 1);
 	glob->zones[glob->num_zones++] = zone;
 	return 0;
 }
