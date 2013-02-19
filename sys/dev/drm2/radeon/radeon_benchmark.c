@@ -36,7 +36,6 @@ __FBSDID("$FreeBSD$");
 #define RADEON_BENCHMARK_ITERATIONS 1024
 #define RADEON_BENCHMARK_COMMON_MODES_N 17
 
-#ifdef DUMBBELL_WIP
 static int radeon_benchmark_do_move(struct radeon_device *rdev, unsigned size,
 				    uint64_t saddr, uint64_t daddr,
 				    int flag, int n)
@@ -91,12 +90,10 @@ static void radeon_benchmark_log_results(int n, unsigned size,
 		 kind, n, size >> 10, sdomain, ddomain, time,
 		 throughput * 8, throughput);
 }
-#endif /* DUMBBELL_WIP */
 
 static void radeon_benchmark_move(struct radeon_device *rdev, unsigned size,
 				  unsigned sdomain, unsigned ddomain)
 {
-#ifdef DUMBBELL_WIP
 	struct radeon_bo *dobj = NULL;
 	struct radeon_bo *sobj = NULL;
 	uint64_t saddr, daddr;
@@ -171,7 +168,6 @@ out_cleanup:
 	if (r) {
 		DRM_ERROR("Error while benchmarking BO move.\n");
 	}
-#endif /* DUMBBELL_WIP */
 }
 
 void radeon_benchmark(struct radeon_device *rdev, int test_number)
