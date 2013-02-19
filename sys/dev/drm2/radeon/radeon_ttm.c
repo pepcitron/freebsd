@@ -583,10 +583,8 @@ static struct ttm_tt *radeon_ttm_tt_create(struct ttm_bo_device *bdev,
 static int radeon_ttm_tt_populate(struct ttm_tt *ttm)
 {
 	struct radeon_device *rdev;
-#ifdef DUMBBELL_WIP
 	struct radeon_ttm_tt *gtt = (void *)ttm;
 	unsigned i;
-#endif /* DUMBBELL_WIP */
 	int r;
 #ifdef DUMBBELL_WIP
 	bool slave = !!(ttm->page_flags & TTM_PAGE_FLAG_SG);
@@ -628,8 +626,9 @@ static int radeon_ttm_tt_populate(struct ttm_tt *ttm)
 		return r;
 	}
 
-#ifdef DUMBBELL_WIP
 	for (i = 0; i < ttm->num_pages; i++) {
+		gtt->ttm.dma_address[i] = VM_PAGE_TO_PHYS(ttm->pages[i]);
+#ifdef DUMBBELL_WIP
 		gtt->ttm.dma_address[i] = pci_map_page(rdev->pdev, ttm->pages[i],
 						       0, PAGE_SIZE,
 						       PCI_DMA_BIDIRECTIONAL);
@@ -642,8 +641,8 @@ static int radeon_ttm_tt_populate(struct ttm_tt *ttm)
 			ttm_pool_unpopulate(ttm);
 			return -EFAULT;
 		}
-	}
 #endif /* DUMBBELL_WIP */
+	}
 	return 0;
 }
 
