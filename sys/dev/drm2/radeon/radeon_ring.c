@@ -301,7 +301,7 @@ int radeon_ib_ring_tests(struct radeon_device *rdev)
 static int radeon_debugfs_ring_init(struct radeon_device *rdev, struct radeon_ring *ring);
 #endif /* DUMBBELL_WIP */
 
-#ifdef DUMBBELL_WIP
+#if defined(DRM_DEBUG_CODE) && DRM_DEBUG_CODE != 0
 /**
  * radeon_ring_write - write a value to the ring
  *
@@ -322,7 +322,7 @@ void radeon_ring_write(struct radeon_ring *ring, uint32_t v)
 	ring->count_dw--;
 	ring->ring_free_dw--;
 }
-#endif /* DUMBBELL_WIP */
+#endif
 
 /**
  * radeon_ring_supports_scratch_reg - check if the ring supports
