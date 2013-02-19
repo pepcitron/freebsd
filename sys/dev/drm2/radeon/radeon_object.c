@@ -342,11 +342,9 @@ void radeon_bo_force_delete(struct radeon_device *rdev)
 
 int radeon_bo_init(struct radeon_device *rdev)
 {
-#ifdef DUMBBELL_WIP
 	/* Add an MTRR for the VRAM */
-	rdev->mc.vram_mtrr = mtrr_add(rdev->mc.aper_base, rdev->mc.aper_size,
-			MTRR_TYPE_WRCOMB, 1);
-#endif /* DUMBBELL_WIP */
+	rdev->mc.vram_mtrr = drm_mtrr_add(rdev->mc.aper_base, rdev->mc.aper_size,
+			DRM_MTRR_WC);
 	DRM_INFO("Detected VRAM RAM=%luM, BAR=%lluM\n",
 		rdev->mc.mc_vram_size >> 20,
 		(unsigned long long)rdev->mc.aper_size >> 20);
