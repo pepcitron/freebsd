@@ -53,16 +53,6 @@ __FBSDID("$FreeBSD$");
 #define FIRMWARE_RS600		"radeonkmsfw_RS600_cp"
 #define FIRMWARE_R520		"radeonkmsfw_R520_cp"
 
-#ifdef DUMBBELL_WIP
-MODULE_FIRMWARE(FIRMWARE_R100);
-MODULE_FIRMWARE(FIRMWARE_R200);
-MODULE_FIRMWARE(FIRMWARE_R300);
-MODULE_FIRMWARE(FIRMWARE_R420);
-MODULE_FIRMWARE(FIRMWARE_RS690);
-MODULE_FIRMWARE(FIRMWARE_RS600);
-MODULE_FIRMWARE(FIRMWARE_R520);
-#endif /* DUMBBELL_WIP */
-
 static int radeon_do_cleanup_cp(struct drm_device * dev);
 static void radeon_do_cp_start(drm_radeon_private_t * dev_priv);
 

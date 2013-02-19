@@ -39,24 +39,6 @@ __FBSDID("$FreeBSD$");
 #define SI_RLC_UCODE_SIZE 2048
 #define SI_MC_UCODE_SIZE 7769
 
-#ifdef DUMBBELL_WIP
-MODULE_FIRMWARE("radeon/TAHITI_pfp.bin");
-MODULE_FIRMWARE("radeon/TAHITI_me.bin");
-MODULE_FIRMWARE("radeon/TAHITI_ce.bin");
-MODULE_FIRMWARE("radeon/TAHITI_mc.bin");
-MODULE_FIRMWARE("radeon/TAHITI_rlc.bin");
-MODULE_FIRMWARE("radeon/PITCAIRN_pfp.bin");
-MODULE_FIRMWARE("radeon/PITCAIRN_me.bin");
-MODULE_FIRMWARE("radeon/PITCAIRN_ce.bin");
-MODULE_FIRMWARE("radeon/PITCAIRN_mc.bin");
-MODULE_FIRMWARE("radeon/PITCAIRN_rlc.bin");
-MODULE_FIRMWARE("radeon/VERDE_pfp.bin");
-MODULE_FIRMWARE("radeon/VERDE_me.bin");
-MODULE_FIRMWARE("radeon/VERDE_ce.bin");
-MODULE_FIRMWARE("radeon/VERDE_mc.bin");
-MODULE_FIRMWARE("radeon/VERDE_rlc.bin");
-#endif /* DUMBBELL_WIP */
-
 /* get temperature in millidegrees */
 int si_get_temp(struct radeon_device *rdev)
 {

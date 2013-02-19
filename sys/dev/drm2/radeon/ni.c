@@ -49,27 +49,6 @@ extern void evergreen_pcie_gen2_enable(struct radeon_device *rdev);
 
 #define ARUBA_RLC_UCODE_SIZE 1536
 
-#ifdef DUMBBELL_WIP
-/* Firmware Names */
-MODULE_FIRMWARE("radeon/BARTS_pfp.bin");
-MODULE_FIRMWARE("radeon/BARTS_me.bin");
-MODULE_FIRMWARE("radeon/BARTS_mc.bin");
-MODULE_FIRMWARE("radeon/BTC_rlc.bin");
-MODULE_FIRMWARE("radeon/TURKS_pfp.bin");
-MODULE_FIRMWARE("radeon/TURKS_me.bin");
-MODULE_FIRMWARE("radeon/TURKS_mc.bin");
-MODULE_FIRMWARE("radeon/CAICOS_pfp.bin");
-MODULE_FIRMWARE("radeon/CAICOS_me.bin");
-MODULE_FIRMWARE("radeon/CAICOS_mc.bin");
-MODULE_FIRMWARE("radeon/CAYMAN_pfp.bin");
-MODULE_FIRMWARE("radeon/CAYMAN_me.bin");
-MODULE_FIRMWARE("radeon/CAYMAN_mc.bin");
-MODULE_FIRMWARE("radeon/CAYMAN_rlc.bin");
-MODULE_FIRMWARE("radeon/ARUBA_pfp.bin");
-MODULE_FIRMWARE("radeon/ARUBA_me.bin");
-MODULE_FIRMWARE("radeon/ARUBA_rlc.bin");
-#endif /* DUMBBELL_WIP */
-
 #define BTC_IO_MC_REGS_SIZE 29
 
 static const u32 barts_io_mc_regs[BTC_IO_MC_REGS_SIZE][2] = {

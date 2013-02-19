@@ -44,31 +44,6 @@ __FBSDID("$FreeBSD$");
 #define R700_PFP_UCODE_SIZE 848
 #define R700_PM4_UCODE_SIZE 1360
 
-#ifdef DUMBBELL_WIP
-/* Firmware Names */
-MODULE_FIRMWARE("radeon/R600_pfp.bin");
-MODULE_FIRMWARE("radeon/R600_me.bin");
-MODULE_FIRMWARE("radeon/RV610_pfp.bin");
-MODULE_FIRMWARE("radeon/RV610_me.bin");
-MODULE_FIRMWARE("radeon/RV630_pfp.bin");
-MODULE_FIRMWARE("radeon/RV630_me.bin");
-MODULE_FIRMWARE("radeon/RV620_pfp.bin");
-MODULE_FIRMWARE("radeon/RV620_me.bin");
-MODULE_FIRMWARE("radeon/RV635_pfp.bin");
-MODULE_FIRMWARE("radeon/RV635_me.bin");
-MODULE_FIRMWARE("radeon/RV670_pfp.bin");
-MODULE_FIRMWARE("radeon/RV670_me.bin");
-MODULE_FIRMWARE("radeon/RS780_pfp.bin");
-MODULE_FIRMWARE("radeon/RS780_me.bin");
-MODULE_FIRMWARE("radeon/RV770_pfp.bin");
-MODULE_FIRMWARE("radeon/RV770_me.bin");
-MODULE_FIRMWARE("radeon/RV730_pfp.bin");
-MODULE_FIRMWARE("radeon/RV730_me.bin");
-MODULE_FIRMWARE("radeon/RV710_pfp.bin");
-MODULE_FIRMWARE("radeon/RV710_me.bin");
-#endif /* DUMBBELL_WIP */
-
-
 # define ATI_PCIGART_PAGE_SIZE		4096	/**< PCI GART page size */
 # define ATI_PCIGART_PAGE_MASK		(~(ATI_PCIGART_PAGE_SIZE-1))
 
