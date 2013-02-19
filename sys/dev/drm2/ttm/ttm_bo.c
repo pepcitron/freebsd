@@ -1439,7 +1439,7 @@ int ttm_bo_global_init(struct drm_global_reference *ref)
 
 	atomic_set(&glob->bo_count, 0);
 
-	refcount_acquire(&glob->kobj_ref);
+	refcount_init(&glob->kobj_ref, 1);
 	return (0);
 
 out_no_shrink:
