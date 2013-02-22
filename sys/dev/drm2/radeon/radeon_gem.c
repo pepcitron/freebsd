@@ -261,14 +261,14 @@ int radeon_gem_create_ioctl(struct drm_device *dev, void *data,
 	uint32_t handle;
 	int r;
 
-	rw_rlock(&rdev->exclusive_lock);
+	sx_slock(&rdev->exclusive_lock);
 	/* create a gem object to contain this object in */
 	args->size = roundup(args->size, PAGE_SIZE);
 	r = radeon_gem_object_create(rdev, args->size, args->alignment,
 					args->initial_domain, false,
 					false, &gobj);
 	if (r) {
-		rw_runlock(&rdev->exclusive_lock);
+		sx_sunlock(&rdev->exclusive_lock);
 		r = radeon_gem_handle_lockup(rdev, r);
 		return r;
 	}
@@ -276,12 +276,12 @@ int radeon_gem_create_ioctl(struct drm_device *dev, void *data,
 	/* drop reference from allocate - handle holds it now */
 	drm_gem_object_unreference_unlocked(gobj);
 	if (r) {
-		rw_runlock(&rdev->exclusive_lock);
+		sx_sunlock(&rdev->exclusive_lock);
 		r = radeon_gem_handle_lockup(rdev, r);
 		return r;
 	}
 	args->handle = handle;
-	rw_runlock(&rdev->exclusive_lock);
+	sx_sunlock(&rdev->exclusive_lock);
 	return 0;
 }
 
@@ -298,12 +298,12 @@ int radeon_gem_set_domain_ioctl(struct drm_device *dev, void *data,
 
 	/* for now if someone requests domain CPU -
 	 * just make sure the buffer is finished with */
-	rw_rlock(&rdev->exclusive_lock);
+	sx_slock(&rdev->exclusive_lock);
 
 	/* just do a BO wait for now */
 	gobj = drm_gem_object_lookup(dev, filp, args->handle);
 	if (gobj == NULL) {
-		rw_runlock(&rdev->exclusive_lock);
+		sx_sunlock(&rdev->exclusive_lock);
 		return -ENOENT;
 	}
 	robj = gem_to_radeon_bo(gobj);
@@ -311,7 +311,7 @@ int radeon_gem_set_domain_ioctl(struct drm_device *dev, void *data,
 	r = radeon_gem_set_domain(gobj, args->read_domains, args->write_domain);
 
 	drm_gem_object_unreference_unlocked(gobj);
-	rw_runlock(&rdev->exclusive_lock);
+	sx_sunlock(&rdev->exclusive_lock);
 	r = radeon_gem_handle_lockup(robj->rdev, r);
 	return r;
 }

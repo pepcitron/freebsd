@@ -1028,7 +1028,7 @@ int radeon_device_init(struct radeon_device *rdev,
 	sx_init(&rdev->pm.mutex, "drm__radeon_device__pm__mutex");
 	sx_init(&rdev->gpu_clock_mutex, "drm__radeon_device__gpu_clock_mutex");
 	sx_init(&rdev->pm.mclk_lock, "drm__radeon_device__pm__mclk_lock");
-	rw_init(&rdev->exclusive_lock, "drm__radeon_device__exclusive_lock");
+	sx_init(&rdev->exclusive_lock, "drm__radeon_device__exclusive_lock");
 	DRM_INIT_WAITQUEUE(&rdev->irq.vblank_queue);
 	r = radeon_gem_init(rdev);
 	if (r)
@@ -1394,7 +1394,7 @@ int radeon_gpu_reset(struct radeon_device *rdev)
 	int i, r;
 	int resched;
 
-	rw_wlock(&rdev->exclusive_lock);
+	sx_xlock(&rdev->exclusive_lock);
 	radeon_save_bios_scratch_regs(rdev);
 	/* block TTM */
 	resched = ttm_bo_lock_delayed_workqueue(&rdev->mman.bdev);
@@ -1451,7 +1451,7 @@ retry:
 		dev_info(rdev->dev, "GPU reset failed\n");
 	}
 
-	rw_wunlock(&rdev->exclusive_lock);
+	sx_xunlock(&rdev->exclusive_lock);
 	return r;
 }
 

@@ -1560,7 +1560,7 @@ typedef void (*radeon_wreg_t)(struct radeon_device*, uint32_t, uint32_t);
 struct radeon_device {
 	device_t			dev;
 	struct drm_device		*ddev;
-	struct rwlock			exclusive_lock;
+	struct sx			exclusive_lock;
 	/* ASIC */
 	union radeon_asic_config	config;
 	enum radeon_family		family;
