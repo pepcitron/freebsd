@@ -106,6 +106,9 @@ CFLAGS  += -I${.CURDIR}/../../../dev/drm2/radeon
 MKREGTABLE=	./mkregtable
 REG_SRCS_DIR=	${.CURDIR}/../../../dev/drm2/radeon/reg_srcs
 
+${MKREGTABLE}: mkregtable.c @
+	${CC} -o $@ @/dev/drm2/radeon/mkregtable.c
+
 rn50_reg_safe.h: ${REG_SRCS_DIR}/rn50 ${MKREGTABLE}
 	${MKREGTABLE} ${REG_SRCS_DIR}/rn50 > $@
 
@@ -135,5 +138,18 @@ evergreen_reg_safe.h: ${REG_SRCS_DIR}/evergreen ${MKREGTABLE}
 
 cayman_reg_safe.h: ${REG_SRCS_DIR}/cayman ${MKREGTABLE}
 	${MKREGTABLE} ${REG_SRCS_DIR}/cayman > $@
+
+CLEANFILES=								\
+	rn50_reg_safe.h							\
+	r100_reg_safe.h							\
+	r200_reg_safe.h							\
+	rv515_reg_safe.h						\
+	r300_reg_safe.h							\
+	r420_reg_safe.h							\
+	rs600_reg_safe.h						\
+	r600_reg_safe.h							\
+	evergreen_reg_safe.h						\
+	cayman_reg_safe.h						\
+	${MKREGTABLE}
 
 .include <bsd.kmod.mk>
