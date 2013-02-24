@@ -180,6 +180,7 @@ reserve:
 	 */
 	if (!bo->mem.bus.is_iomem) {
 		/* Allocate all page at once, most common usage */
+		ttm = bo->ttm;
 		if (ttm->bdev->driver->ttm_tt_populate(ttm)) {
 			retval = VM_PAGER_ERROR;
 			goto out_io_unlock;
