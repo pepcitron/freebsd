@@ -41,7 +41,8 @@ MALLOC_DEFINE(M_TTM_PD, "ttm_pd", "TTM Page Directories");
  */
 static void ttm_tt_alloc_page_directory(struct ttm_tt *ttm)
 {
-	ttm->pages = malloc(ttm->num_pages * sizeof(void*), M_TTM_PD, M_WAITOK);
+	ttm->pages = malloc(ttm->num_pages * sizeof(void*),
+	    M_TTM_PD, M_WAITOK | M_ZERO);
 }
 
 static void ttm_dma_tt_alloc_page_directory(struct ttm_dma_tt *ttm)
