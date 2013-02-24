@@ -56,7 +56,7 @@ static int ttm_agp_bind(struct ttm_tt *ttm, struct ttm_mem_reg *bo_mem)
 
 	mem = agp_alloc_memory(agp_be->bridge,
 	    (cached) ? AGP_USER_CACHED_MEMORY : AGP_USER_MEMORY,
-	    ttm->num_pages);
+	    ttm->num_pages << AGP_PAGE_SHIFT);
 	if (unlikely(mem == NULL))
 		return -ENOMEM;
 
