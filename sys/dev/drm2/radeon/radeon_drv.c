@@ -347,13 +347,11 @@ static struct drm_driver_info kms_driver = {
 #endif /* DUMBBELL_WIP */
 	.load = radeon_driver_load_kms,
 	.use_msi = radeon_msi_ok,
-#ifdef DUMBBELL_WIP
 	.firstopen = radeon_driver_firstopen_kms,
 	.open = radeon_driver_open_kms,
 	.preclose = radeon_driver_preclose_kms,
 	.postclose = radeon_driver_postclose_kms,
 	.lastclose = radeon_driver_lastclose_kms,
-#endif /* DUMBBELL_WIP */
 	.unload = radeon_driver_unload_kms,
 #ifdef DUMBBELL_WIP
 	.suspend = radeon_suspend_kms,
