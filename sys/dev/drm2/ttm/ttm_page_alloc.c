@@ -266,8 +266,10 @@ static void ttm_pages_put(vm_page_t *pages, unsigned npages)
 	/* Our VM handles vm memattr automatically on the page free. */
 	if (set_pages_array_wb(pages, npages))
 		printf("[TTM] Failed to set %d pages to wb!\n", npages);
-	for (i = 0; i < npages; ++i)
+	for (i = 0; i < npages; ++i) {
+		pages[i]->flags &= ~PG_FICTITIOUS;
 		vm_page_free(pages[i]);
+	}
 }
 
 static void ttm_pool_update_free_locked(struct ttm_page_pool *pool,
@@ -443,6 +445,7 @@ static void ttm_handle_caching_state_failure(struct pglist *pages,
 	/* Failed pages have to be freed */
 	for (i = 0; i < cpages; ++i) {
 		TAILQ_REMOVE(pages, failed_pages[i], pageq);
+		failed_pages[i]->flags &= ~PG_FICTITIOUS;
 		vm_page_free(failed_pages[i]);
 	}
 }
@@ -488,6 +491,8 @@ static int ttm_alloc_new_pages(struct pglist *pages, int vm_alloc_flags,
 			r = -ENOMEM;
 			goto out;
 		}
+		p->oflags &= ~VPO_UNMANAGED;
+		p->flags |= PG_FICTITIOUS;
 
 #ifdef CONFIG_HIGHMEM /* KIB: nop */
 		/* gfp flags of highmem page should never be dma32 so we
@@ -630,6 +635,7 @@ static void ttm_put_pages(vm_page_t *pages, unsigned npages, int flags,
 		/* No pool for this memory type so free the pages */
 		for (i = 0; i < npages; i++) {
 			if (pages[i]) {
+				pages[i]->flags &= ~PG_FICTITIOUS;
 				vm_page_free(pages[i]);
 				pages[i] = NULL;
 			}
@@ -669,9 +675,12 @@ static int ttm_get_pages(vm_page_t *pages, unsigned npages, int flags,
 	struct ttm_page_pool *pool = ttm_get_pool(flags, cstate);
 	struct pglist plist;
 	vm_page_t p = NULL;
-	int vm_alloc_flags = VM_ALLOC_NORMAL | VM_ALLOC_NOBUSY | VM_ALLOC_NOOBJ;
+	int vm_alloc_flags;
 	unsigned count;
 	int r;
+
+	vm_alloc_flags = VM_ALLOC_NORMAL | VM_ALLOC_NOBUSY | VM_ALLOC_WIRED |
+	    VM_ALLOC_NOOBJ;
 
 	/* set zero flag for page allocation if required */
 	if (flags & TTM_PAGE_FLAG_ZERO_ALLOC)
@@ -687,6 +696,8 @@ static int ttm_get_pages(vm_page_t *pages, unsigned npages, int flags,
 				printf("[TTM] Unable to allocate page\n");
 				return -ENOMEM;
 			}
+			p->oflags &= ~VPO_UNMANAGED;
+			p->flags |= PG_FICTITIOUS;
 
 			pages[r] = p;
 		}
@@ -754,15 +765,17 @@ int ttm_page_alloc_init(struct ttm_mem_global *glob, unsigned max_pages)
 
 	_manager = malloc(sizeof(*_manager), M_TTM_POOLMGR, M_WAITOK | M_ZERO);
 
-	ttm_page_pool_init_locked(&_manager->wc_pool, VM_ALLOC_NORMAL, "wc");
+	ttm_page_pool_init_locked(&_manager->wc_pool,
+	    VM_ALLOC_NORMAL | VM_ALLOC_WIRED, "wc");
 
-	ttm_page_pool_init_locked(&_manager->uc_pool, VM_ALLOC_NORMAL, "uc");
+	ttm_page_pool_init_locked(&_manager->uc_pool,
+	    VM_ALLOC_NORMAL | VM_ALLOC_WIRED, "uc");
 
 	ttm_page_pool_init_locked(&_manager->wc_pool_dma32,
-	    VM_ALLOC_NORMAL | VM_ALLOC_DMA32, "wc dma");
+	    VM_ALLOC_NORMAL | VM_ALLOC_WIRED | VM_ALLOC_DMA32, "wc dma");
 
 	ttm_page_pool_init_locked(&_manager->uc_pool_dma32,
-	    VM_ALLOC_NORMAL | VM_ALLOC_DMA32, "uc dma");
+	    VM_ALLOC_NORMAL | VM_ALLOC_WIRED | VM_ALLOC_DMA32, "uc dma");
 
 	_manager->options.max_size = max_pages;
 	_manager->options.small = SMALL_ALLOCATION;
