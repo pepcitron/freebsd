@@ -1148,6 +1148,18 @@ int radeon_device_init(struct radeon_device *rdev,
 		if (r)
 			return r;
 	}
+
+	DRM_INFO("%s: Taking over the fictitious range 0x%lx-0x%lx\n",
+	    __func__, rdev->mc.aper_base,
+	    rdev->mc.aper_base + rdev->mc.visible_vram_size);
+	r = vm_phys_fictitious_reg_range(
+	    rdev->mc.aper_base,
+	    rdev->mc.aper_base + rdev->mc.visible_vram_size,
+	    VM_MEMATTR_WRITE_COMBINING);
+	if (r != 0) {
+		return (-r);
+	}
+
 	if ((radeon_testing & 1)) {
 		radeon_test_moves(rdev);
 	}
@@ -1178,6 +1190,11 @@ void radeon_device_fini(struct radeon_device *rdev)
 	rdev->shutdown = true;
 	/* evict vram memory */
 	radeon_bo_evict_vram(rdev);
+
+	vm_phys_fictitious_unreg_range(
+	    rdev->mc.aper_base,
+	    rdev->mc.aper_base + rdev->mc.visible_vram_size);
+
 	radeon_fini(rdev);
 #ifdef DUMBBELL_WIP
 	vga_switcheroo_unregister_client(rdev->pdev);

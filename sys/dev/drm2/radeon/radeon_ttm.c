@@ -409,7 +409,6 @@ memcpy:
 
 static int radeon_ttm_io_mem_reserve(struct ttm_bo_device *bdev, struct ttm_mem_reg *mem)
 {
-	int ret;
 	struct ttm_mem_type_manager *man = &bdev->man[mem->mem_type];
 	struct radeon_device *rdev = radeon_get_rdev(bdev);
 
@@ -440,18 +439,6 @@ static int radeon_ttm_io_mem_reserve(struct ttm_bo_device *bdev, struct ttm_mem_
 		if ((mem->bus.offset + mem->bus.size) > rdev->mc.visible_vram_size)
 			return -EINVAL;
 		mem->bus.base = rdev->mc.aper_base;
-		DRM_INFO("%s: Taking over the fictitious range 0x%lx-0x%lx "
-		    "(base = %lx, offset = %lx, size = %lu bytes)\n",
-		    __func__, mem->bus.base + mem->bus.offset,
-		    mem->bus.base + mem->bus.offset + mem->bus.size,
-		    mem->bus.base, mem->bus.offset, mem->bus.size);
-		ret = vm_phys_fictitious_reg_range(
-		    mem->bus.base + mem->bus.offset,
-		    mem->bus.base + mem->bus.offset + mem->bus.size,
-		    ttm_io_prot(mem->placement));
-		if (ret != 0) {
-			return (-ret);
-		}
 		mem->bus.is_iomem = true;
 #ifdef __alpha__
 		/*
@@ -485,18 +472,6 @@ static int radeon_ttm_io_mem_reserve(struct ttm_bo_device *bdev, struct ttm_mem_
 
 static void radeon_ttm_io_mem_free(struct ttm_bo_device *bdev, struct ttm_mem_reg *mem)
 {
-
-	switch (mem->mem_type) {
-	case TTM_PL_SYSTEM:
-		break;
-	case TTM_PL_TT:
-		break;
-	case TTM_PL_VRAM:
-		vm_phys_fictitious_unreg_range(
-		    mem->bus.base + mem->bus.offset,
-		    mem->bus.base + mem->bus.offset + mem->bus.size);
-		break;
-	}
 }
 
 static int radeon_sync_obj_wait(void *sync_obj, bool lazy, bool interruptible)
