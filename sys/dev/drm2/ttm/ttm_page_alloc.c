@@ -636,7 +636,10 @@ static void ttm_put_pages(vm_page_t *pages, unsigned npages, int flags,
 		for (i = 0; i < npages; i++) {
 			if (pages[i]) {
 				pages[i]->flags &= ~PG_FICTITIOUS;
+				vm_page_lock(pages[i]);
+				vm_page_unwire(pages[i], 0);
 				vm_page_free(pages[i]);
+				vm_page_unlock(pages[i]);
 				pages[i] = NULL;
 			}
 		}
