@@ -28,6 +28,9 @@
  * Authors: Thomas Hellstrom <thellstrom-at-vmware-dot-com>
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
 #include <dev/drm2/drmP.h>
 #include <dev/drm2/drm_global.h>
 
@@ -56,7 +59,6 @@ void drm_global_init(void)
 void drm_global_release(void)
 {
 	int i;
-
 	for (i = 0; i < DRM_GLOBAL_NUM; ++i) {
 		struct drm_global_item *item = &glob[i];
 		MPASS(item->object == NULL);

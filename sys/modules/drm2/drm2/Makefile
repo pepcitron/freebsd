@@ -5,14 +5,12 @@ KMOD	= drm2
 SRCS	= \
 	drm_agpsupport.c \
 	drm_auth.c \
-	drm_buffer.c \
 	drm_bufs.c \
 	drm_context.c \
 	drm_crtc.c \
 	drm_crtc_helper.c \
 	drm_dma.c \
 	drm_dp_iic_helper.c \
-	drm_dp_helper.c \
 	drm_drawable.c \
 	drm_drv.c \
 	drm_edid.c \
@@ -35,7 +33,6 @@ SRCS	= \
 	drm_stub.c \
 	drm_sysctl.c \
 	drm_vm.c \
-	ati_pcigart.c \
 	ttm_lock.c \
 	ttm_object.c \
 	ttm_tt.c \
@@ -45,8 +42,8 @@ SRCS	= \
 	ttm_execbuf_util.c \
 	ttm_memory.c \
 	ttm_page_alloc.c \
-	ttm_bo_vm.c \
-	ttm_agp_backend.c
+	ttm_bo_vm.c
+#ttm_agp_backend.c
 #ttm_page_alloc_dma.c
 
 .if ${MACHINE_CPUARCH} == "amd64"

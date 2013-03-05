@@ -27,6 +27,16 @@
 /*
  * Authors: Thomas Hellstrom <thellstrom-at-vmware-dot-com>
  */
+/*
+ * Copyright (c) 2013 The FreeBSD Foundation
+ * All rights reserved.
+ *
+ * Portions of this software were developed by Konstantin Belousov
+ * <kib@FreeBSD.org> under sponsorship from the FreeBSD Foundation.
+ */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
 #include <dev/drm2/drmP.h>
 #include <dev/drm2/ttm/ttm_module.h>
@@ -41,13 +51,13 @@ MALLOC_DEFINE(M_TTM_PD, "ttm_pd", "TTM Page Directories");
  */
 static void ttm_tt_alloc_page_directory(struct ttm_tt *ttm)
 {
-	ttm->pages = malloc(ttm->num_pages * sizeof(void*),
+	ttm->pages = malloc(ttm->num_pages * sizeof(void *),
 	    M_TTM_PD, M_WAITOK | M_ZERO);
 }
 
 static void ttm_dma_tt_alloc_page_directory(struct ttm_dma_tt *ttm)
 {
-	ttm->ttm.pages = malloc(ttm->ttm.num_pages * sizeof(void*),
+	ttm->ttm.pages = malloc(ttm->ttm.num_pages * sizeof(void *),
 	    M_TTM_PD, M_WAITOK | M_ZERO);
 	ttm->dma_address = malloc(ttm->ttm.num_pages *
 	    sizeof(*ttm->dma_address), M_TTM_PD, M_WAITOK);

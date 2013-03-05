@@ -27,6 +27,8 @@
 /*
  * Authors: Thomas Hellstrom <thellstrom-at-vmware-dot-com>
  */
+/* $FreeBSD$ */
+
 #ifndef _TTM_BO_DRIVER_H_
 #define _TTM_BO_DRIVER_H_
 
@@ -981,8 +983,9 @@ extern vm_memattr_t ttm_io_prot(uint32_t caching_flags);
 
 extern const struct ttm_mem_type_manager_func ttm_bo_manager_func;
 
-#if __OS_HAS_AGP
+#if (defined(CONFIG_AGP) || (defined(CONFIG_AGP_MODULE) && defined(MODULE)))
 #define TTM_HAS_AGP
+#include <linux/agp_backend.h>
 
 /**
  * ttm_agp_tt_create
@@ -999,7 +1002,7 @@ extern const struct ttm_mem_type_manager_func ttm_bo_manager_func;
  * bind and unbind memory backing a ttm_tt.
  */
 extern struct ttm_tt *ttm_agp_tt_create(struct ttm_bo_device *bdev,
-					device_t bridge,
+					struct agp_bridge_data *bridge,
 					unsigned long size, uint32_t page_flags,
 					struct vm_page *dummy_read_page);
 int ttm_agp_tt_populate(struct ttm_tt *ttm);

@@ -29,6 +29,9 @@
  *          Keith Packard.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+
 #include <dev/drm2/drmP.h>
 #include <dev/drm2/ttm/ttm_module.h>
 #include <dev/drm2/ttm/ttm_bo_driver.h>
@@ -38,7 +41,7 @@
 
 struct ttm_agp_backend {
 	struct ttm_tt ttm;
-	void *mem;
+	struct agp_memory *mem;
 	device_t bridge;
 };
 
@@ -48,19 +51,14 @@ static int ttm_agp_bind(struct ttm_tt *ttm, struct ttm_mem_reg *bo_mem)
 {
 	struct ttm_agp_backend *agp_be = container_of(ttm, struct ttm_agp_backend, ttm);
 	struct drm_mm_node *node = bo_mem->mm_node;
-	void *mem;
+	struct agp_memory *mem;
 	int ret, cached = (bo_mem->placement & TTM_PL_FLAG_CACHED);
-#ifdef DUMBBELL_WIP
 	unsigned i;
-#endif /* DUMBBELL_WIP */
 
-	mem = agp_alloc_memory(agp_be->bridge,
-	    (cached) ? AGP_USER_CACHED_MEMORY : AGP_USER_MEMORY,
-	    ttm->num_pages << AGP_PAGE_SHIFT);
+	mem = agp_alloc_memory(agp_be->bridge, AGP_USER_MEMORY, ttm->num_pages);
 	if (unlikely(mem == NULL))
 		return -ENOMEM;
 
-#ifdef DUMBBELL_WIP
 	mem->page_count = 0;
 	for (i = 0; i < ttm->num_pages; i++) {
 		vm_page_t page = ttm->pages[i];
@@ -70,17 +68,14 @@ static int ttm_agp_bind(struct ttm_tt *ttm, struct ttm_mem_reg *bo_mem)
 
 		mem->pages[mem->page_count++] = page;
 	}
-#endif /* DUMBBELL_WIP */
 	agp_be->mem = mem;
 
-#ifdef DUMBBELL_WIP
 	mem->is_flushed = 1;
 	mem->type = (cached) ? AGP_USER_CACHED_MEMORY : AGP_USER_MEMORY;
-#endif /* DUMBBELL_WIP */
 
-	ret = agp_bind_memory(agp_be->bridge, mem, node->start * PAGE_SIZE);
+	ret = agp_bind_memory(mem, node->start);
 	if (ret)
-		DRM_ERROR("AGP Bind memory failed\n");
+		pr_err("AGP Bind memory failed\n");
 
 	return ret;
 }
@@ -90,12 +85,9 @@ static int ttm_agp_unbind(struct ttm_tt *ttm)
 	struct ttm_agp_backend *agp_be = container_of(ttm, struct ttm_agp_backend, ttm);
 
 	if (agp_be->mem) {
-		struct agp_memory_info mem_info;
-		agp_memory_info(agp_be->bridge, agp_be->mem, &mem_info);
-
-		if (mem_info.ami_is_bound)
-			return agp_unbind_memory(agp_be->bridge, agp_be->mem);
-		agp_free_memory(agp_be->bridge, agp_be->mem);
+		if (agp_be->mem->is_bound)
+			return agp_unbind_memory(agp_be->mem);
+		agp_free_memory(agp_be->mem);
 		agp_be->mem = NULL;
 	}
 	return 0;

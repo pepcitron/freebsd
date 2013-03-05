@@ -27,6 +27,16 @@
 /*
  * Authors: Thomas Hellstrom <thellstrom-at-vmware-dot-com>
  */
+/*
+ * Copyright (c) 2013 The FreeBSD Foundation
+ * All rights reserved.
+ *
+ * Portions of this software were developed by Konstantin Belousov
+ * <kib@FreeBSD.org> under sponsorship from the FreeBSD Foundation.
+ */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
 #include "opt_vm.h"
 
