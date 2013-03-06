@@ -613,7 +613,7 @@ static unsigned r600_blit_create_rect(unsigned num_gpu_pages,
 		w = (pages * RECT_UNIT_W * RECT_UNIT_H) / h;
 		w = (w / RECT_UNIT_W) * RECT_UNIT_W;
 		pages = (w * h) / (RECT_UNIT_W * RECT_UNIT_H);
-		KASSERT(pages != 0, "r600_blit_create_rect: pages == 0");
+		KASSERT(pages != 0, ("r600_blit_create_rect: pages == 0"));
 	}
 
 

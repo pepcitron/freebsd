@@ -324,8 +324,8 @@ int radeon_sa_bo_new(struct radeon_device *rdev,
 	unsigned tries[RADEON_NUM_RINGS];
 	int i, r;
 
-	KASSERT(align <= RADEON_GPU_PAGE_SIZE, "align > RADEON_GPU_PAGE_SIZE");
-	KASSERT(size <= sa_manager->size, "size > sa_manager->size");
+	KASSERT(align <= RADEON_GPU_PAGE_SIZE, ("align > RADEON_GPU_PAGE_SIZE"));
+	KASSERT(size <= sa_manager->size, ("size > sa_manager->size"));
 
 	*sa_bo = malloc(sizeof(struct radeon_sa_bo), DRM_MEM_DRIVER, M_WAITOK);
 	if ((*sa_bo) == NULL) {

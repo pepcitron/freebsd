@@ -1466,7 +1466,7 @@ u32 r6xx_remap_render_backend(struct radeon_device *rdev,
 
 	rendering_pipe_num = 1 << tiling_pipe_num;
 	req_rb_num = total_max_rb_num - r600_count_pipe_bits(disabled_rb_mask);
-	KASSERT(rendering_pipe_num >= req_rb_num, "rendering_pipe_num < req_rb_num");
+	KASSERT(rendering_pipe_num >= req_rb_num, ("rendering_pipe_num < req_rb_num"));
 
 	pipe_rb_ratio = rendering_pipe_num / req_rb_num;
 	pipe_rb_remain = rendering_pipe_num - pipe_rb_ratio * req_rb_num;
