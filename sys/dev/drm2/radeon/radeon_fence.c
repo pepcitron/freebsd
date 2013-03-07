@@ -306,6 +306,7 @@ static int radeon_fence_wait_seq(struct radeon_device *rdev, u64 target_seq,
 		trace_radeon_fence_wait_begin(rdev->ddev, seq);
 #endif /* DUMBBELL_WIP */
 		radeon_irq_kms_sw_irq_get(rdev, ring);
+		r = 0;
 		fence_queue_locked = false;
 		while (!(signaled = radeon_fence_seq_signaled(rdev,
 		    target_seq, ring))) {
@@ -492,6 +493,7 @@ static int radeon_fence_wait_any_seq(struct radeon_device *rdev,
 				radeon_irq_kms_sw_irq_get(rdev, i);
 			}
 		}
+		r = 0;
 		fence_queue_locked = false;
 		while (!(signaled = radeon_fence_any_seq_signaled(rdev,
 		    target_seq))) {
