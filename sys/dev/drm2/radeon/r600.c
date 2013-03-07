@@ -835,7 +835,7 @@ void r600_pcie_gart_tlb_flush(struct radeon_device *rdev)
 	/* flush hdp cache so updates hit vram */
 	if ((rdev->family >= CHIP_RV770) && (rdev->family <= CHIP_RV740) &&
 	    !(rdev->flags & RADEON_IS_AGP)) {
-		void __iomem *ptr = (void *)rdev->gart.ptr;
+		volatile uint32_t *ptr = rdev->gart.ptr;
 		u32 tmp;
 
 		/* r7xx hw bug.  write to HDP_DEBUG1 followed by fb read
@@ -844,7 +844,7 @@ void r600_pcie_gart_tlb_flush(struct radeon_device *rdev)
 		 * method for them.
 		 */
 		WREG32(HDP_DEBUG1, 0);
-		tmp = readl((void __iomem *)ptr);
+		tmp = *ptr;
 	} else
 		WREG32(R_005480_HDP_MEM_COHERENCY_FLUSH_CNTL, 0x1);
 
@@ -2463,7 +2463,7 @@ int r600_dma_ring_test(struct radeon_device *rdev,
 {
 	unsigned i;
 	int r;
-	void __iomem *ptr = (void *)rdev->vram_scratch.ptr;
+	volatile uint32_t *ptr = rdev->vram_scratch.ptr;
 	u32 tmp;
 
 	if (!ptr) {
@@ -2471,10 +2471,8 @@ int r600_dma_ring_test(struct radeon_device *rdev,
 		return -EINVAL;
 	}
 
-#ifdef DUMBBELL_WIP
 	tmp = 0xCAFEDEAD;
-	writel(tmp, ptr);
-#endif /* DUMBBELL_WIP */
+	*ptr = tmp; /* Was writel() on Linux -- dumbbell@ */
 
 	r = radeon_ring_lock(rdev, ring, 4);
 	if (r) {
@@ -2488,7 +2486,7 @@ int r600_dma_ring_test(struct radeon_device *rdev,
 	radeon_ring_unlock_commit(rdev, ring);
 
 	for (i = 0; i < rdev->usec_timeout; i++) {
-		tmp = readl(ptr);
+		tmp = *ptr;
 		if (tmp == 0xDEADBEEF)
 			break;
 		DRM_UDELAY(1);
@@ -3094,7 +3092,7 @@ int r600_dma_ib_test(struct radeon_device *rdev, struct radeon_ring *ring)
 	struct radeon_ib ib;
 	unsigned i;
 	int r;
-	void __iomem *ptr = (void *)rdev->vram_scratch.ptr;
+	volatile uint32_t *ptr = rdev->vram_scratch.ptr;
 	u32 tmp = 0;
 
 	if (!ptr) {
@@ -3102,10 +3100,8 @@ int r600_dma_ib_test(struct radeon_device *rdev, struct radeon_ring *ring)
 		return -EINVAL;
 	}
 
-#ifdef DUMBBELL_WIP
 	tmp = 0xCAFEDEAD;
-	writel(tmp, ptr);
-#endif /* DUMBBELL_WIP */
+	*ptr = tmp; /* Was writel() on Linux -- dumbbell@ */
 
 	r = radeon_ib_get(rdev, ring->idx, &ib, NULL, 256);
 	if (r) {
@@ -3132,7 +3128,7 @@ int r600_dma_ib_test(struct radeon_device *rdev, struct radeon_ring *ring)
 		return r;
 	}
 	for (i = 0; i < rdev->usec_timeout; i++) {
-		tmp = readl(ptr);
+		tmp = *ptr;
 		if (tmp == 0xDEADBEEF)
 			break;
 		DRM_UDELAY(1);
@@ -4068,11 +4064,11 @@ void r600_ioctl_wait_idle(struct radeon_device *rdev, struct radeon_bo *bo)
 	 */
 	if ((rdev->family >= CHIP_RV770) && (rdev->family <= CHIP_RV740) &&
 	    rdev->vram_scratch.ptr && !(rdev->flags & RADEON_IS_AGP)) {
-		void __iomem *ptr = (void *)rdev->vram_scratch.ptr;
+		volatile uint32_t *ptr = rdev->vram_scratch.ptr;
 		u32 tmp;
 
 		WREG32(HDP_DEBUG1, 0);
-		tmp = readl((void __iomem *)ptr);
+		tmp = *ptr;
 	} else
 		WREG32(R_005480_HDP_MEM_COHERENCY_FLUSH_CNTL, 0x1);
 }
