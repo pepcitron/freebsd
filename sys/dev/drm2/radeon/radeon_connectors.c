@@ -639,7 +639,7 @@ static void radeon_connector_destroy(struct drm_connector *connector)
 	struct radeon_connector *radeon_connector = to_radeon_connector(connector);
 
 	if (radeon_connector->edid)
-		free(radeon_connector->edid, DRM_MEM_DRIVER);
+		free(radeon_connector->edid, DRM_MEM_KMS);
 	free(radeon_connector->con_priv, DRM_MEM_DRIVER);
 #ifdef DUMBBELL_WIP
 	drm_sysfs_connector_remove(connector);
@@ -1207,7 +1207,7 @@ static void radeon_dp_connector_destroy(struct drm_connector *connector)
 	struct radeon_connector_atom_dig *radeon_dig_connector = radeon_connector->con_priv;
 
 	if (radeon_connector->edid)
-		free(radeon_connector->edid, DRM_MEM_DRIVER);
+		free(radeon_connector->edid, DRM_MEM_KMS);
 	if (radeon_dig_connector->dp_i2c_bus)
 		radeon_i2c_destroy(radeon_dig_connector->dp_i2c_bus);
 	free(radeon_connector->con_priv, DRM_MEM_DRIVER);
@@ -1366,7 +1366,7 @@ radeon_dp_detect(struct drm_connector *connector, bool force)
 		return connector->status;
 
 	if (radeon_connector->edid) {
-		free(radeon_connector->edid, DRM_MEM_DRIVER);
+		free(radeon_connector->edid, DRM_MEM_KMS);
 		radeon_connector->edid = NULL;
 	}
 

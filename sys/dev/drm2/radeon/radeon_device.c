@@ -772,7 +772,7 @@ void radeon_atombios_fini(struct radeon_device *rdev)
 {
 	if (rdev->mode_info.atom_context) {
 		free(rdev->mode_info.atom_context->scratch, DRM_MEM_DRIVER);
-		free(rdev->mode_info.atom_context, DRM_MEM_DRIVER);
+		atom_destroy(rdev->mode_info.atom_context);
 	}
 	free(rdev->mode_info.atom_card_info, DRM_MEM_DRIVER);
 }

@@ -691,8 +691,13 @@ void radeon_pm_fini(struct radeon_device *rdev)
 #endif /* DUMBBELL_WIP */
 	}
 
-	if (rdev->pm.power_state)
+	if (rdev->pm.power_state) {
+		int i;
+		for (i = 0; i < rdev->pm.num_power_states; ++i) {
+			free(rdev->pm.power_state[i].clock_info, DRM_MEM_DRIVER);
+		}
 		free(rdev->pm.power_state, DRM_MEM_DRIVER);
+	}
 
 	radeon_hwmon_fini(rdev);
 }
