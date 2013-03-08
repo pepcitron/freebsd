@@ -1324,16 +1324,21 @@ kqueue_scan(struct kqueue *kq, int maxevents, struct kevent_copyops *k_ops,
 	rsbt = 0;
 	if (tsp != NULL) {
 		if (tsp->tv_sec < 0 || tsp->tv_nsec < 0 ||
-		    tsp->tv_nsec > 1000000000) {
+		    tsp->tv_nsec >= 1000000000) {
 			error = EINVAL;
 			goto done_nl;
 		}
 		if (timespecisset(tsp)) {
-			rsbt = tstosbt(*tsp);
-			if (TIMESEL(&asbt, rsbt))
-				asbt += tc_tick_sbt;
-			asbt += rsbt;
-			rsbt >>= tc_precexp;
+			if (tsp->tv_sec < INT32_MAX) {
+				rsbt = tstosbt(*tsp);
+				if (TIMESEL(&asbt, rsbt))
+					asbt += tc_tick_sbt;
+				asbt += rsbt;
+				if (asbt < rsbt)
+					asbt = 0;
+				rsbt >>= tc_precexp;
+			} else
+				asbt = 0;
 		} else
 			asbt = -1;
 	} else
