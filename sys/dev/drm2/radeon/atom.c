@@ -62,7 +62,6 @@ typedef struct {
 
 int atom_debug = 0;
 static int atom_execute_table_locked(struct atom_context *ctx, int index, uint32_t * params);
-int atom_execute_table(struct atom_context *ctx, int index, uint32_t * params);
 
 static uint32_t atom_arg_mask[8] =
     { 0xFFFFFFFF, 0xFFFF, 0xFFFF00, 0xFFFF0000, 0xFF, 0xFF00, 0xFF0000,
@@ -220,7 +219,7 @@ static uint32_t atom_get_src_int(atom_exec_context *ctx, uint8_t attr,
 		(*ptr)++;
 		/* get_unaligned_le32 avoids unaligned accesses from atombios
 		 * tables, noticed on a DEC Alpha. */
-		val = le32toh((u32 *)&ctx->ps[idx]);
+		val = get_unaligned_le32((u32 *)&ctx->ps[idx]);
 		if (print)
 			DEBUG("PS[0x%02X,0x%04X]", idx, val);
 		break;

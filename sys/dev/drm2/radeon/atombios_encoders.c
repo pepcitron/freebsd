@@ -31,9 +31,8 @@ __FBSDID("$FreeBSD$");
 #include <dev/drm2/drm_crtc_helper.h>
 #include <dev/drm2/radeon/radeon_drm.h>
 #include "radeon.h"
+#include "radeon_asic.h" /* Declares several prototypes; clang is pleased. */
 #include "atom.h"
-
-extern int atom_debug;
 
 static u8
 radeon_atom_get_backlight_level_from_reg(struct radeon_device *rdev)

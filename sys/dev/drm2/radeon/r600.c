@@ -98,9 +98,7 @@ MODULE_FIRMWARE("radeon/SUMO2_me.bin");
 int r600_debugfs_mc_info_init(struct radeon_device *rdev);
 
 /* r600,rv610,rv630,rv620,rv635,rv670 */
-int r600_mc_wait_for_idle(struct radeon_device *rdev);
 static void r600_gpu_init(struct radeon_device *rdev);
-void r600_fini(struct radeon_device *rdev);
 void r600_irq_disable(struct radeon_device *rdev);
 static void r600_pcie_gen2_enable(struct radeon_device *rdev);
 
@@ -1211,6 +1209,7 @@ static int r600_mc_init(struct radeon_device *rdev)
 int r600_vram_scratch_init(struct radeon_device *rdev)
 {
 	int r;
+	void *vram_scratch_ptr_ptr;
 
 	if (rdev->vram_scratch.robj == NULL) {
 		r = radeon_bo_create(rdev, RADEON_GPU_PAGE_SIZE,
@@ -1230,8 +1229,9 @@ int r600_vram_scratch_init(struct radeon_device *rdev)
 		radeon_bo_unreserve(rdev->vram_scratch.robj);
 		return r;
 	}
+	vram_scratch_ptr_ptr = &rdev->vram_scratch.ptr;
 	r = radeon_bo_kmap(rdev->vram_scratch.robj,
-				(void **)&rdev->vram_scratch.ptr);
+				vram_scratch_ptr_ptr);
 	if (r)
 		radeon_bo_unpin(rdev->vram_scratch.robj);
 	radeon_bo_unreserve(rdev->vram_scratch.robj);
@@ -3203,6 +3203,7 @@ void r600_ih_ring_init(struct radeon_device *rdev, unsigned ring_size)
 int r600_ih_ring_alloc(struct radeon_device *rdev)
 {
 	int r;
+	void *ring_ptr;
 
 	/* Allocate ring buffer */
 	if (rdev->ih.ring_obj == NULL) {
@@ -3225,8 +3226,9 @@ int r600_ih_ring_alloc(struct radeon_device *rdev)
 			DRM_ERROR("radeon: failed to pin ih ring buffer (%d).\n", r);
 			return r;
 		}
+		ring_ptr = &rdev->ih.ring;
 		r = radeon_bo_kmap(rdev->ih.ring_obj,
-				   (void **)&rdev->ih.ring);
+				   ring_ptr);
 		radeon_bo_unreserve(rdev->ih.ring_obj);
 		if (r) {
 			DRM_ERROR("radeon: failed to map ih ring buffer (%d).\n", r);

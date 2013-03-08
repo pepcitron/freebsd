@@ -34,7 +34,6 @@ __FBSDID("$FreeBSD$");
 #include "ni_reg.h"
 #include "cayman_blit_shaders.h"
 
-extern int evergreen_mc_wait_for_idle(struct radeon_device *rdev);
 extern void evergreen_pcie_gen2_enable(struct radeon_device *rdev);
 
 #define EVERGREEN_PFP_UCODE_SIZE 1120

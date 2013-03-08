@@ -48,7 +48,6 @@ __FBSDID("$FreeBSD$");
 #include "rs600_reg_safe.h"
 
 static void rs600_gpu_init(struct radeon_device *rdev);
-int rs600_mc_wait_for_idle(struct radeon_device *rdev);
 
 static const u32 crtc_offsets[2] =
 {

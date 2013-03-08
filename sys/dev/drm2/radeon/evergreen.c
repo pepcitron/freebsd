@@ -49,7 +49,6 @@ static const u32 crtc_offsets[6] =
 };
 
 static void evergreen_gpu_init(struct radeon_device *rdev);
-void evergreen_fini(struct radeon_device *rdev);
 void evergreen_pcie_gen2_enable(struct radeon_device *rdev);
 
 void evergreen_tiling_fields(unsigned tiling_flags, unsigned *bankw,

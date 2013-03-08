@@ -687,6 +687,7 @@ int radeon_ring_init(struct radeon_device *rdev, struct radeon_ring *ring, unsig
 		     u32 ptr_reg_shift, u32 ptr_reg_mask, u32 nop)
 {
 	int r;
+	void *ring_ptr;
 
 	ring->ring_size = ring_size;
 	ring->rptr_offs = rptr_offs;
@@ -714,8 +715,9 @@ int radeon_ring_init(struct radeon_device *rdev, struct radeon_ring *ring, unsig
 			dev_err(rdev->dev, "(%d) ring pin failed\n", r);
 			return r;
 		}
+		ring_ptr = &ring->ring;
 		r = radeon_bo_kmap(ring->ring_obj,
-				       (void **)&ring->ring);
+				       ring_ptr);
 		radeon_bo_unreserve(ring->ring_obj);
 		if (r) {
 			dev_err(rdev->dev, "(%d) ring map failed\n", r);

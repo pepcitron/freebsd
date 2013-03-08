@@ -1458,7 +1458,6 @@ union radeon_asic_config {
 /*
  * asic initizalization from radeon_asic.c
  */
-void radeon_agp_disable(struct radeon_device *rdev);
 int radeon_asic_init(struct radeon_device *rdev);
 
 
@@ -1884,16 +1883,12 @@ extern int radeon_wb_init(struct radeon_device *rdev);
 extern void radeon_wb_disable(struct radeon_device *rdev);
 extern void radeon_surface_init(struct radeon_device *rdev);
 extern int radeon_cs_parser_init(struct radeon_cs_parser *p, void *data);
-extern void radeon_legacy_set_clock_gating(struct radeon_device *rdev, int enable);
-extern void radeon_atom_set_clock_gating(struct radeon_device *rdev, int enable);
 extern void radeon_ttm_placement_from_domain(struct radeon_bo *rbo, u32 domain);
 extern bool radeon_ttm_bo_is_radeon_bo(struct ttm_buffer_object *bo);
 extern void radeon_vram_location(struct radeon_device *rdev, struct radeon_mc *mc, u64 base);
 extern void radeon_gtt_location(struct radeon_device *rdev, struct radeon_mc *mc);
 extern int radeon_resume_kms(struct drm_device *dev);
-#ifdef DUMBBELL_WIP
-extern int radeon_suspend_kms(struct drm_device *dev, pm_message_t state);
-#endif /* DUMBBELL_WIP */
+extern int radeon_suspend_kms(struct drm_device *dev);
 extern void radeon_ttm_set_active_vram_size(struct radeon_device *rdev, u64 size);
 
 /*
@@ -1992,8 +1987,6 @@ extern void radeon_acpi_fini(struct radeon_device *rdev);
 /* Prototypes added by @dumbbell. */
 
 /* atombios_encoders.c */
-u8	atombios_get_backlight_level(struct radeon_encoder *radeon_encoder);
-void	atombios_set_backlight_level(struct radeon_encoder *radeon_encoder, u8 level);
 void	radeon_atom_backlight_init(struct radeon_encoder *radeon_encoder,
 	    struct drm_connector *drm_connector);
 void	radeon_add_atom_encoder(struct drm_device *dev, uint32_t encoder_enum,
@@ -2027,17 +2020,10 @@ void	radeon_add_atom_connector(struct drm_device *dev,
 	    struct radeon_hpd *hpd,
 	    struct radeon_router *router);
 
-/* radeon_device.c */
-int radeon_suspend_kms(struct drm_device *dev);
-int radeon_resume_kms(struct drm_device *dev);
-
 /* radeon_encoders.c */
 uint32_t	radeon_get_encoder_enum(struct drm_device *dev,
 		    uint32_t supported_device, uint8_t dac);
 void		radeon_link_encoder_connector(struct drm_device *dev);
-void		radeon_add_atom_encoder(struct drm_device *dev,
-		    uint32_t encoder_enum,
-		    uint32_t supported_device, u16 caps);
 
 /* radeon_legacy_encoders.c */
 void	radeon_add_legacy_encoder(struct drm_device *dev,

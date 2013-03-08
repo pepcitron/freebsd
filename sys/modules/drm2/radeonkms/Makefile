@@ -101,7 +101,8 @@ SRCS	+=								\
 	iicbus_if.h							\
 	pci_if.h
 
-CFLAGS  += -I${.CURDIR}/../../../dev/drm2/radeon
+CFLAGS  += -I${.CURDIR}/../../../dev/drm2/radeon			\
+	   -fms-extensions
 
 MKREGTABLE=	./mkregtable
 REG_SRCS_DIR=	${.CURDIR}/../../../dev/drm2/radeon/reg_srcs

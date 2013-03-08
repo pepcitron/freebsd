@@ -181,7 +181,6 @@ extern int rv370_pcie_gart_init(struct radeon_device *rdev);
 extern void rv370_pcie_gart_fini(struct radeon_device *rdev);
 extern int rv370_pcie_gart_enable(struct radeon_device *rdev);
 extern void rv370_pcie_gart_disable(struct radeon_device *rdev);
-extern int r300_mc_wait_for_idle(struct radeon_device *rdev);
 
 /*
  * r420,r423,rv410
@@ -392,7 +391,6 @@ void r600_kms_blit_copy(struct radeon_device *rdev,
 			u64 src_gpu_addr, u64 dst_gpu_addr,
 			unsigned num_gpu_pages,
 			struct radeon_sa_bo *vb);
-int r600_mc_wait_for_idle(struct radeon_device *rdev);
 uint64_t r600_get_gpu_clock(struct radeon_device *rdev);
 
 /*
