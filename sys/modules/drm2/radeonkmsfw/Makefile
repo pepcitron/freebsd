@@ -24,11 +24,6 @@ SUBDIR=									\
 	JUNIPER_me							\
 	JUNIPER_pfp							\
 	JUNIPER_rlc							\
-	OLAND_ce							\
-	OLAND_mc							\
-	OLAND_me							\
-	OLAND_pfp							\
-	OLAND_rlc							\
 	PALM_me								\
 	PALM_pfp							\
 	PITCAIRN_ce							\
@@ -36,11 +31,38 @@ SUBDIR=									\
 	PITCAIRN_me							\
 	PITCAIRN_pfp							\
 	PITCAIRN_rlc							\
+	R100_cp								\
+	R200_cp								\
+	R300_cp								\
+	R420_cp								\
+	R520_cp								\
+	R600_me								\
+	R600_pfp							\
 	R600_rlc							\
 	R700_rlc							\
 	REDWOOD_me							\
 	REDWOOD_pfp							\
 	REDWOOD_rlc							\
+	RS600_cp							\
+	RS690_cp							\
+	RS780_me							\
+	RS780_pfp							\
+	RV610_me							\
+	RV610_pfp							\
+	RV620_me							\
+	RV620_pfp							\
+	RV630_me							\
+	RV630_pfp							\
+	RV635_me							\
+	RV635_pfp							\
+	RV670_me							\
+	RV670_pfp							\
+	RV710_me							\
+	RV710_pfp							\
+	RV730_me							\
+	RV730_pfp							\
+	RV770_me							\
+	RV770_pfp							\
 	SUMO2_me							\
 	SUMO2_pfp							\
 	SUMO_me								\
