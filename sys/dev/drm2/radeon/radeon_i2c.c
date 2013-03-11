@@ -1086,7 +1086,6 @@ struct radeon_i2c_chan *radeon_i2c_create(struct drm_device *dev,
 			device_delete_child(dev->device, iicbus_dev);
 			goto out_free;
 		}
-		i2c->iic_bus = iicbus_dev;
 	} else if (rec->hw_capable &&
 		   radeon_hw_i2c &&
 		   ASIC_IS_DCE3(rdev)) {
@@ -1116,7 +1115,6 @@ struct radeon_i2c_chan *radeon_i2c_create(struct drm_device *dev,
 			device_delete_child(dev->device, iicbus_dev);
 			goto out_free;
 		}
-		i2c->iic_bus = iicbus_dev;
 	} else {
 		device_t icbb_dev;
 
