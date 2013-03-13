@@ -384,10 +384,10 @@ static int radeon_crtc_page_flip(struct drm_crtc *crtc,
 	obj = new_radeon_fb->obj;
 	rbo = gem_to_radeon_bo(obj);
 
-	DRM_SPINLOCK(&rbo->tbo.bdev->fence_lock);
+	mtx_lock(&rbo->tbo.bdev->fence_lock);
 	if (rbo->tbo.sync_obj)
 		work->fence = radeon_fence_ref(rbo->tbo.sync_obj);
-	DRM_SPINUNLOCK(&rbo->tbo.bdev->fence_lock);
+	mtx_unlock(&rbo->tbo.bdev->fence_lock);
 
 	TASK_INIT(&work->work, 0, radeon_unpin_work_func, work);
 
