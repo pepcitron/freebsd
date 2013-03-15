@@ -88,11 +88,10 @@ SYSCTL_INT(_kern_ipc, OID_AUTO, m_defragrandomfailures, CTLFLAG_RW,
  * m_get2() allocates minimum mbuf that would fit "size" argument.
  */
 struct mbuf *
-m_get2(int how, short type, int flags, int size)
+m_get2(int size, int how, short type, int flags)
 {
 	struct mb_args args;
 	struct mbuf *m, *n;
-	uma_zone_t zone;
 
 	args.flags = flags;
 	args.type = type;
@@ -101,24 +100,15 @@ m_get2(int how, short type, int flags, int size)
 		return (uma_zalloc_arg(zone_mbuf, &args, how));
 	if (size <= MCLBYTES)
 		return (uma_zalloc_arg(zone_pack, &args, how));
-	if (size > MJUM16BYTES)
+
+	if (size > MJUMPAGESIZE)
 		return (NULL);
 
 	m = uma_zalloc_arg(zone_mbuf, &args, how);
 	if (m == NULL)
 		return (NULL);
 
-#if MJUMPAGESIZE != MCLBYTES
-	if (size <= MJUMPAGESIZE)
-		zone = zone_jumbop;
-	else
-#endif
-	if (size <= MJUM9BYTES)
-		zone = zone_jumbo9;
-	else
-		zone = zone_jumbo16;
-
-	n = uma_zalloc_arg(zone, m, how);
+	n = uma_zalloc_arg(zone_jumbop, m, how);
 	if (n == NULL) {
 		uma_zfree(zone_mbuf, m);
 		return (NULL);
@@ -255,25 +245,30 @@ m_freem(struct mbuf *mb)
  * Returns:
  *    Nothing.
  */
-void
+int
 m_extadd(struct mbuf *mb, caddr_t buf, u_int size,
-    void (*freef)(void *, void *), void *arg1, void *arg2, int flags, int type)
+    void (*freef)(void *, void *), void *arg1, void *arg2, int flags, int type,
+    int wait)
 {
 	KASSERT(type != EXT_CLUSTER, ("%s: EXT_CLUSTER not allowed", __func__));
 
 	if (type != EXT_EXTREF)
-		mb->m_ext.ref_cnt = (u_int *)uma_zalloc(zone_ext_refcnt, M_NOWAIT);
-	if (mb->m_ext.ref_cnt != NULL) {
-		*(mb->m_ext.ref_cnt) = 1;
-		mb->m_flags |= (M_EXT | flags);
-		mb->m_ext.ext_buf = buf;
-		mb->m_data = mb->m_ext.ext_buf;
-		mb->m_ext.ext_size = size;
-		mb->m_ext.ext_free = freef;
-		mb->m_ext.ext_arg1 = arg1;
-		mb->m_ext.ext_arg2 = arg2;
-		mb->m_ext.ext_type = type;
-        }
+		mb->m_ext.ref_cnt = uma_zalloc(zone_ext_refcnt, wait);
+
+	if (mb->m_ext.ref_cnt == NULL)
+		return (ENOMEM);
+
+	*(mb->m_ext.ref_cnt) = 1;
+	mb->m_flags |= (M_EXT | flags);
+	mb->m_ext.ext_buf = buf;
+	mb->m_data = mb->m_ext.ext_buf;
+	mb->m_ext.ext_size = size;
+	mb->m_ext.ext_free = freef;
+	mb->m_ext.ext_arg1 = arg1;
+	mb->m_ext.ext_arg2 = arg2;
+	mb->m_ext.ext_type = type;
+
+	return (0);
 }
 
 /*

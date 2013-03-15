@@ -60,6 +60,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/mount.h>
 #include <sys/mbuf.h>
 #include <sys/protosw.h>
+#include <sys/rwlock.h>
 #include <sys/sf_buf.h>
 #include <sys/sysent.h>
 #include <sys/socket.h>
@@ -1700,18 +1701,16 @@ sockargs(mp, buf, buflen, type)
 	struct mbuf *m;
 	int error;
 
-	if ((u_int)buflen > MLEN) {
+	if (buflen > MLEN) {
 #ifdef COMPAT_OLDSOCK
-		if (type == MT_SONAME && (u_int)buflen <= 112)
+		if (type == MT_SONAME && buflen <= 112)
 			buflen = MLEN;		/* unix domain compat. hack */
 		else
 #endif
-			if ((u_int)buflen > MCLBYTES)
+			if (buflen > MCLBYTES)
 				return (EINVAL);
 	}
-	m = m_get(M_WAITOK, type);
-	if ((u_int)buflen > MLEN)
-		MCLGET(m, M_WAITOK);
+	m = m_get2(buflen, M_WAITOK, type, 0);
 	m->m_len = buflen;
 	error = copyin(buf, mtod(m, caddr_t), (u_int)buflen);
 	if (error)
@@ -1907,12 +1906,12 @@ kern_sendfile(struct thread *td, struct sendfile_args *uap,
 			 * reclamation of its vnode does not
 			 * immediately destroy it.
 			 */
-			VM_OBJECT_LOCK(obj);
+			VM_OBJECT_WLOCK(obj);
 			if ((obj->flags & OBJ_DEAD) == 0) {
 				vm_object_reference_locked(obj);
-				VM_OBJECT_UNLOCK(obj);
+				VM_OBJECT_WUNLOCK(obj);
 			} else {
-				VM_OBJECT_UNLOCK(obj);
+				VM_OBJECT_WUNLOCK(obj);
 				obj = NULL;
 			}
 		}
@@ -2089,7 +2088,7 @@ retry_space:
 			vm_offset_t pgoff;
 			struct mbuf *m0;
 
-			VM_OBJECT_LOCK(obj);
+			VM_OBJECT_WLOCK(obj);
 			/*
 			 * Calculate the amount to transfer.
 			 * Not to exceed a page, the EOF,
@@ -2107,7 +2106,7 @@ retry_space:
 			xfsize = omin(rem, xfsize);
 			xfsize = omin(space - loopbytes, xfsize);
 			if (xfsize <= 0) {
-				VM_OBJECT_UNLOCK(obj);
+				VM_OBJECT_WUNLOCK(obj);
 				done = 1;		/* all data sent */
 				break;
 			}
@@ -2128,7 +2127,7 @@ retry_space:
 			 * block.
 			 */
 			if (pg->valid && vm_page_is_valid(pg, pgoff, xfsize))
-				VM_OBJECT_UNLOCK(obj);
+				VM_OBJECT_WUNLOCK(obj);
 			else if (m != NULL)
 				error = EAGAIN;	/* send what we already got */
 			else if (uap->flags & SF_NODISKIO)
@@ -2142,7 +2141,7 @@ retry_space:
 				 * when the I/O completes.
 				 */
 				vm_page_io_start(pg);
-				VM_OBJECT_UNLOCK(obj);
+				VM_OBJECT_WUNLOCK(obj);
 
 				/*
 				 * Get the page from backing store.
@@ -2164,10 +2163,10 @@ retry_space:
 				    td->td_ucred, NOCRED, &resid, td);
 				VOP_UNLOCK(vp, 0);
 			after_read:
-				VM_OBJECT_LOCK(obj);
+				VM_OBJECT_WLOCK(obj);
 				vm_page_io_finish(pg);
 				if (!error)
-					VM_OBJECT_UNLOCK(obj);
+					VM_OBJECT_WUNLOCK(obj);
 				mbstat.sf_iocnt++;
 			}
 			if (error) {
@@ -2182,7 +2181,7 @@ retry_space:
 				    pg->busy == 0 && !(pg->oflags & VPO_BUSY))
 					vm_page_free(pg);
 				vm_page_unlock(pg);
-				VM_OBJECT_UNLOCK(obj);
+				VM_OBJECT_WUNLOCK(obj);
 				if (error == EAGAIN)
 					error = 0;	/* not a real error */
 				break;
@@ -2221,8 +2220,14 @@ retry_space:
 				sf_buf_mext((void *)sf_buf_kva(sf), sf);
 				break;
 			}
-			MEXTADD(m0, sf_buf_kva(sf), PAGE_SIZE, sf_buf_mext,
-			    sfs, sf, M_RDONLY, EXT_SFBUF);
+			if (m_extadd(m0, (caddr_t )sf_buf_kva(sf), PAGE_SIZE,
+			    sf_buf_mext, sfs, sf, M_RDONLY, EXT_SFBUF,
+			    (mnw ? M_NOWAIT : M_WAITOK)) != 0) {
+				error = (mnw ? EAGAIN : ENOBUFS);
+				sf_buf_mext((void *)sf_buf_kva(sf), sf);
+				m_freem(m0);
+				break;
+			}
 			m0->m_data = (char *)sf_buf_kva(sf) + pgoff;
 			m0->m_len = xfsize;
 
@@ -2385,8 +2390,10 @@ sys_sctp_peeloff(td, uap)
 
 	CURVNET_SET(head->so_vnet);
 	so = sonewconn(head, SS_ISCONNECTED);
-	if (so == NULL)
+	if (so == NULL) {
+		error = ENOMEM;
 		goto noconnection;
+	}
 	/*
 	 * Before changing the flags on the socket, we have to bump the
 	 * reference count.  Otherwise, if the protocol calls sofree(),
