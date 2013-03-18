@@ -2472,7 +2472,7 @@ int r600_dma_ring_test(struct radeon_device *rdev,
 	}
 
 	tmp = 0xCAFEDEAD;
-	*ptr = tmp; /* Was writel() on Linux -- dumbbell@ */
+	*ptr = tmp;
 
 	r = radeon_ring_lock(rdev, ring, 4);
 	if (r) {
@@ -3101,7 +3101,7 @@ int r600_dma_ib_test(struct radeon_device *rdev, struct radeon_ring *ring)
 	}
 
 	tmp = 0xCAFEDEAD;
-	*ptr = tmp; /* Was writel() on Linux -- dumbbell@ */
+	*ptr = tmp;
 
 	r = radeon_ib_get(rdev, ring->idx, &ib, NULL, 256);
 	if (r) {
