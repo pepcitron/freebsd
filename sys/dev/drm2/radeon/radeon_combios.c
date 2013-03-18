@@ -440,14 +440,14 @@ bool radeon_combios_check_hardcoded_edid(struct radeon_device *rdev)
 
 	raw = rdev->bios + edid_info;
 	size = EDID_LENGTH * (raw[0x7e] + 1);
-	edid = malloc(size, DRM_MEM_DRIVER, M_WAITOK);
+	edid = malloc(size, DRM_MEM_KMS, M_WAITOK);
 	if (edid == NULL)
 		return false;
 
 	memcpy((unsigned char *)edid, raw, size);
 
 	if (!drm_edid_is_valid(edid)) {
-		free(edid, DRM_MEM_DRIVER);
+		free(edid, DRM_MEM_KMS);
 		return false;
 	}
 
@@ -464,7 +464,7 @@ radeon_bios_get_hardcoded_edid(struct radeon_device *rdev)
 
 	if (rdev->mode_info.bios_hardcoded_edid) {
 		edid = malloc(rdev->mode_info.bios_hardcoded_edid_size,
-		    DRM_MEM_DRIVER, M_WAITOK);
+		    DRM_MEM_KMS, M_WAITOK);
 		if (edid) {
 			memcpy((unsigned char *)edid,
 			       (unsigned char *)rdev->mode_info.bios_hardcoded_edid,

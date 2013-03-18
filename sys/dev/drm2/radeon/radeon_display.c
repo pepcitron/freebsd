@@ -1413,7 +1413,7 @@ int radeon_modeset_init(struct radeon_device *rdev)
 void radeon_modeset_fini(struct radeon_device *rdev)
 {
 	radeon_fbdev_fini(rdev);
-	free(rdev->mode_info.bios_hardcoded_edid, DRM_MEM_DRIVER);
+	free(rdev->mode_info.bios_hardcoded_edid, DRM_MEM_KMS);
 	radeon_pm_fini(rdev);
 
 	if (rdev->mode_info.mode_config_initialized) {

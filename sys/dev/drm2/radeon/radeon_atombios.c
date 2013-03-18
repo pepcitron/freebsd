@@ -1619,7 +1619,7 @@ struct radeon_encoder_atom_dig *radeon_atombios_get_lvds_info(struct
 						struct edid *edid;
 						int edid_size =
 							max((int)EDID_LENGTH, (int)fake_edid_record->ucFakeEDIDLength);
-						edid = malloc(edid_size, DRM_MEM_DRIVER, M_WAITOK);
+						edid = malloc(edid_size, DRM_MEM_KMS, M_WAITOK);
 						if (edid) {
 							memcpy((u8 *)edid, (u8 *)&fake_edid_record->ucFakeEDIDString[0],
 							       fake_edid_record->ucFakeEDIDLength);
@@ -1628,7 +1628,7 @@ struct radeon_encoder_atom_dig *radeon_atombios_get_lvds_info(struct
 								rdev->mode_info.bios_hardcoded_edid = edid;
 								rdev->mode_info.bios_hardcoded_edid_size = edid_size;
 							} else
-								free(edid, DRM_MEM_DRIVER);
+								free(edid, DRM_MEM_KMS);
 						}
 					}
 					record += sizeof(ATOM_FAKE_EDID_PATCH_RECORD);

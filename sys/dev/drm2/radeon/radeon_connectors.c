@@ -742,7 +742,7 @@ radeon_vga_detect(struct drm_connector *connector, bool force)
 	if (dret) {
 		radeon_connector->detected_by_load = false;
 		if (radeon_connector->edid) {
-			free(radeon_connector->edid, DRM_MEM_DRIVER);
+			free(radeon_connector->edid, DRM_MEM_KMS);
 			radeon_connector->edid = NULL;
 		}
 		radeon_connector->edid = drm_get_edid(&radeon_connector->base, radeon_connector->ddc_bus->adapter);
@@ -758,7 +758,7 @@ radeon_vga_detect(struct drm_connector *connector, bool force)
 			 * with a shared ddc line (often vga + hdmi)
 			 */
 			if (radeon_connector->use_digital && radeon_connector->shared_ddc) {
-				free(radeon_connector->edid, DRM_MEM_DRIVER);
+				free(radeon_connector->edid, DRM_MEM_KMS);
 				radeon_connector->edid = NULL;
 				ret = connector_status_disconnected;
 			} else
@@ -948,7 +948,7 @@ radeon_dvi_detect(struct drm_connector *connector, bool force)
 	if (dret) {
 		radeon_connector->detected_by_load = false;
 		if (radeon_connector->edid) {
-			free(radeon_connector->edid, DRM_MEM_DRIVER);
+			free(radeon_connector->edid, DRM_MEM_KMS);
 			radeon_connector->edid = NULL;
 		}
 		radeon_connector->edid = drm_get_edid(&radeon_connector->base, radeon_connector->ddc_bus->adapter);
@@ -973,7 +973,7 @@ radeon_dvi_detect(struct drm_connector *connector, bool force)
 			 * with a shared ddc line (often vga + hdmi)
 			 */
 			if ((!radeon_connector->use_digital) && radeon_connector->shared_ddc) {
-				free(radeon_connector->edid, DRM_MEM_DRIVER);
+				free(radeon_connector->edid, DRM_MEM_KMS);
 				radeon_connector->edid = NULL;
 				ret = connector_status_disconnected;
 			} else
@@ -998,7 +998,7 @@ radeon_dvi_detect(struct drm_connector *connector, bool force)
 						if (list_connector->connector_type != DRM_MODE_CONNECTOR_VGA) {
 							/* hpd is our only option in this case */
 							if (!radeon_hpd_sense(rdev, radeon_connector->hpd.hpd)) {
-								free(radeon_connector->edid, DRM_MEM_DRIVER);
+								free(radeon_connector->edid, DRM_MEM_KMS);
 								radeon_connector->edid = NULL;
 								ret = connector_status_disconnected;
 							}
