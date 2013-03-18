@@ -651,10 +651,8 @@ static int radeon_ttm_tt_populate(struct ttm_tt *ttm)
 static void radeon_ttm_tt_unpopulate(struct ttm_tt *ttm)
 {
 	struct radeon_device *rdev;
-#ifdef DUMBBELL_WIP
 	struct radeon_ttm_tt *gtt = (void *)ttm;
 	unsigned i;
-#endif /* DUMBBELL_WIP */
 	bool slave = !!(ttm->page_flags & TTM_PAGE_FLAG_SG);
 
 	if (slave)
@@ -677,14 +675,15 @@ static void radeon_ttm_tt_unpopulate(struct ttm_tt *ttm)
 	}
 #endif
 
-#ifdef DUMBBELL_WIP
 	for (i = 0; i < ttm->num_pages; i++) {
 		if (gtt->ttm.dma_address[i]) {
+			gtt->ttm.dma_address[i] = 0;
+#ifdef DUMBBELL_WIP
 			pci_unmap_page(rdev->pdev, gtt->ttm.dma_address[i],
 				       PAGE_SIZE, PCI_DMA_BIDIRECTIONAL);
+#endif /* DUMBBELL_WIP */
 		}
 	}
-#endif /* DUMBBELL_WIP */
 
 	ttm_pool_unpopulate(ttm);
 }
