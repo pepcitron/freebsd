@@ -281,7 +281,7 @@ static int radeon_fence_wait_seq(struct radeon_device *rdev, u64 target_seq,
 	uint64_t seq;
 	unsigned i;
 	bool signaled, fence_queue_locked;
-	int r;
+	int r = 0;
 
 	while (target_seq > atomic_load_acq_long(&rdev->fence_drv[ring].last_seq)) {
 		if (!rdev->ring[ring].ready) {
@@ -306,7 +306,6 @@ static int radeon_fence_wait_seq(struct radeon_device *rdev, u64 target_seq,
 		trace_radeon_fence_wait_begin(rdev->ddev, seq);
 #endif /* DUMBBELL_WIP */
 		radeon_irq_kms_sw_irq_get(rdev, ring);
-		r = 0;
 		fence_queue_locked = false;
 		while (!(signaled = radeon_fence_seq_signaled(rdev,
 		    target_seq, ring))) {
@@ -448,7 +447,7 @@ static int radeon_fence_wait_any_seq(struct radeon_device *rdev,
 	unsigned long timeout, last_activity, tmp;
 	unsigned i, ring = RADEON_NUM_RINGS;
 	bool signaled, fence_queue_locked;
-	int r;
+	int r = 0;
 
 	for (i = 0, last_activity = 0; i < RADEON_NUM_RINGS; ++i) {
 		if (!target_seq[i]) {
@@ -493,7 +492,6 @@ static int radeon_fence_wait_any_seq(struct radeon_device *rdev,
 				radeon_irq_kms_sw_irq_get(rdev, i);
 			}
 		}
-		r = 0;
 		fence_queue_locked = false;
 		while (!(signaled = radeon_fence_any_seq_signaled(rdev,
 		    target_seq))) {
