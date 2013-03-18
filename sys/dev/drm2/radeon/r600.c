@@ -1221,12 +1221,15 @@ int r600_vram_scratch_init(struct radeon_device *rdev)
 	}
 
 	r = radeon_bo_reserve(rdev->vram_scratch.robj, false);
-	if (unlikely(r != 0))
+	if (unlikely(r != 0)) {
+		radeon_bo_unref(&rdev->vram_scratch.robj);
 		return r;
+	}
 	r = radeon_bo_pin(rdev->vram_scratch.robj,
 			  RADEON_GEM_DOMAIN_VRAM, &rdev->vram_scratch.gpu_addr);
 	if (r) {
 		radeon_bo_unreserve(rdev->vram_scratch.robj);
+		radeon_bo_unref(&rdev->vram_scratch.robj);
 		return r;
 	}
 	vram_scratch_ptr_ptr = &rdev->vram_scratch.ptr;
@@ -1235,6 +1238,8 @@ int r600_vram_scratch_init(struct radeon_device *rdev)
 	if (r)
 		radeon_bo_unpin(rdev->vram_scratch.robj);
 	radeon_bo_unreserve(rdev->vram_scratch.robj);
+	if (r)
+		radeon_bo_unref(&rdev->vram_scratch.robj);
 
 	return r;
 }
@@ -3216,22 +3221,28 @@ int r600_ih_ring_alloc(struct radeon_device *rdev)
 			return r;
 		}
 		r = radeon_bo_reserve(rdev->ih.ring_obj, false);
-		if (unlikely(r != 0))
+		if (unlikely(r != 0)) {
+			radeon_bo_unref(&rdev->ih.ring_obj);
 			return r;
+		}
 		r = radeon_bo_pin(rdev->ih.ring_obj,
 				  RADEON_GEM_DOMAIN_GTT,
 				  &rdev->ih.gpu_addr);
 		if (r) {
 			radeon_bo_unreserve(rdev->ih.ring_obj);
+			radeon_bo_unref(&rdev->ih.ring_obj);
 			DRM_ERROR("radeon: failed to pin ih ring buffer (%d).\n", r);
 			return r;
 		}
 		ring_ptr = &rdev->ih.ring;
 		r = radeon_bo_kmap(rdev->ih.ring_obj,
 				   ring_ptr);
+		if (r)
+			radeon_bo_unpin(rdev->ih.ring_obj);
 		radeon_bo_unreserve(rdev->ih.ring_obj);
 		if (r) {
 			DRM_ERROR("radeon: failed to map ih ring buffer (%d).\n", r);
+			radeon_bo_unref(&rdev->ih.ring_obj);
 			return r;
 		}
 	}

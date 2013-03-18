@@ -706,12 +706,15 @@ int radeon_ring_init(struct radeon_device *rdev, struct radeon_ring *ring, unsig
 			return r;
 		}
 		r = radeon_bo_reserve(ring->ring_obj, false);
-		if (unlikely(r != 0))
+		if (unlikely(r != 0)) {
+			radeon_bo_unref(&ring->ring_obj);
 			return r;
+		}
 		r = radeon_bo_pin(ring->ring_obj, RADEON_GEM_DOMAIN_GTT,
 					&ring->gpu_addr);
 		if (r) {
 			radeon_bo_unreserve(ring->ring_obj);
+			radeon_bo_unref(&ring->ring_obj);
 			dev_err(rdev->dev, "(%d) ring pin failed\n", r);
 			return r;
 		}
@@ -721,6 +724,7 @@ int radeon_ring_init(struct radeon_device *rdev, struct radeon_ring *ring, unsig
 		radeon_bo_unreserve(ring->ring_obj);
 		if (r) {
 			dev_err(rdev->dev, "(%d) ring map failed\n", r);
+			radeon_bo_unref(&ring->ring_obj);
 			return r;
 		}
 	}

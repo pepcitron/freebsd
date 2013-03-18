@@ -710,7 +710,7 @@ static struct ttm_bo_driver radeon_bo_driver = {
 
 int radeon_ttm_init(struct radeon_device *rdev)
 {
-	int r;
+	int r, r2;
 
 	r = radeon_ttm_global_init(rdev);
 	if (r) {
@@ -740,8 +740,10 @@ int radeon_ttm_init(struct radeon_device *rdev)
 		return r;
 	}
 	r = radeon_bo_reserve(rdev->stollen_vga_memory, false);
-	if (r)
+	if (r) {
+		radeon_bo_unref(&rdev->stollen_vga_memory);
 		return r;
+	}
 	r = radeon_bo_pin(rdev->stollen_vga_memory, RADEON_GEM_DOMAIN_VRAM, NULL);
 	radeon_bo_unreserve(rdev->stollen_vga_memory);
 	if (r) {
@@ -754,6 +756,12 @@ int radeon_ttm_init(struct radeon_device *rdev)
 				rdev->mc.gtt_size >> PAGE_SHIFT);
 	if (r) {
 		DRM_ERROR("Failed initializing GTT heap.\n");
+		r2 = radeon_bo_reserve(rdev->stollen_vga_memory, false);
+		if (likely(r2 == 0)) {
+			radeon_bo_unpin(rdev->stollen_vga_memory);
+			radeon_bo_unreserve(rdev->stollen_vga_memory);
+		}
+		radeon_bo_unref(&rdev->stollen_vga_memory);
 		return r;
 	}
 	DRM_INFO("radeon: %uM of GTT memory ready.\n",
@@ -765,6 +773,12 @@ int radeon_ttm_init(struct radeon_device *rdev)
 	r = radeon_ttm_debugfs_init(rdev);
 	if (r) {
 		DRM_ERROR("Failed to init debugfs\n");
+		r2 = radeon_bo_reserve(rdev->stollen_vga_memory, false);
+		if (likely(r2 == 0)) {
+			radeon_bo_unpin(rdev->stollen_vga_memory);
+			radeon_bo_unreserve(rdev->stollen_vga_memory);
+		}
+		radeon_bo_unref(&rdev->stollen_vga_memory);
 		return r;
 	}
 	return 0;
