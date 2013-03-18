@@ -2488,6 +2488,7 @@ static void r600_cs_parser_fini(struct radeon_cs_parser *parser, int error)
 	}
 	free(parser->chunks, DRM_MEM_DRIVER);
 	free(parser->chunks_array, DRM_MEM_DRIVER);
+	free(parser->track, DRM_MEM_DRIVER);
 }
 
 int r600_cs_legacy(struct drm_device *dev, void *data, struct drm_file *filp,

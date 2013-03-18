@@ -2086,6 +2086,8 @@ int r100_cs_parse(struct radeon_cs_parser *p)
 	do {
 		r = r100_cs_packet_parse(p, &pkt, p->idx);
 		if (r) {
+			free(p->track, DRM_MEM_DRIVER);
+			p->track = NULL;
 			return r;
 		}
 		p->idx += pkt.count + 2;
@@ -2110,12 +2112,18 @@ int r100_cs_parse(struct radeon_cs_parser *p)
 			default:
 				DRM_ERROR("Unknown packet type %d !\n",
 					  pkt.type);
+				free(p->track, DRM_MEM_DRIVER);
+				p->track = NULL;
 				return -EINVAL;
 		}
 		if (r) {
+			free(p->track, DRM_MEM_DRIVER);
+			p->track = NULL;
 			return r;
 		}
 	} while (p->idx < p->chunks[p->chunk_ib_idx].length_dw);
+	free(p->track, DRM_MEM_DRIVER);
+	p->track = NULL;
 	return 0;
 }
 
