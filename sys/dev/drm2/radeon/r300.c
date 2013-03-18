@@ -76,7 +76,7 @@ void rv370_pcie_gart_tlb_flush(struct radeon_device *rdev)
 
 int rv370_pcie_gart_set_page(struct radeon_device *rdev, int i, uint64_t addr)
 {
-	void __iomem *ptr = rdev->gart.ptr;
+	volatile uint32_t *ptr = rdev->gart.ptr;
 
 	if (i < 0 || i > rdev->gart.num_gpu_pages) {
 		return -EINVAL;
@@ -87,7 +87,7 @@ int rv370_pcie_gart_set_page(struct radeon_device *rdev, int i, uint64_t addr)
 	/* on x86 we want this to be CPU endian, on powerpc
 	 * on powerpc without HW swappers, it'll get swapped on way
 	 * into VRAM - so no need for cpu_to_le32 on VRAM tables */
-	*(uint64_t *)(((uintptr_t)ptr) + (i * 4)) = addr; /* Was writel() on Linux -- dumbbell@ */
+	*(ptr + (i * 4)) = (uint32_t)addr;
 	return 0;
 }
 
