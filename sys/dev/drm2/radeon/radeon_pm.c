@@ -699,6 +699,8 @@ void radeon_pm_fini(struct radeon_device *rdev)
 			free(rdev->pm.power_state[i].clock_info, DRM_MEM_DRIVER);
 		}
 		free(rdev->pm.power_state, DRM_MEM_DRIVER);
+		rdev->pm.power_state = NULL;
+		rdev->pm.num_power_states = 0;
 	}
 
 	radeon_hwmon_fini(rdev);
