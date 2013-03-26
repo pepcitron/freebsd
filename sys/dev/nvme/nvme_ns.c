@@ -90,7 +90,7 @@ nvme_ns_ioctl(struct cdev *cdev, u_long cmd, caddr_t arg, int flag,
 		    nvme_ns_cb, &cpl);
 		msleep(&cpl, mtx, PRIBIO, "nvme_ioctl", 0);
 		mtx_unlock(mtx);
-		if (cpl.sf_sc || cpl.sf_sct)
+		if (nvme_completion_is_error(&cpl))
 			return (ENXIO);
 		memcpy(arg, &ns->data, sizeof(ns->data));
 		break;
@@ -132,7 +132,7 @@ nvme_ns_close(struct cdev *dev __unused, int flags, int fmt __unused,
 }
 
 static void
-nvme_ns_strategy_done(void *arg, const struct nvme_completion *status)
+nvme_ns_strategy_done(void *arg, const struct nvme_completion *cpl)
 {
 	struct bio *bp = arg;
 
@@ -140,7 +140,7 @@ nvme_ns_strategy_done(void *arg, const struct nvme_completion *status)
 	 * TODO: add more extensive translation of NVMe status codes
 	 *  to different bio error codes (i.e. EIO, EINVAL, etc.)
 	 */
-	if (status->sf_sc || status->sf_sct) {
+	if (nvme_completion_is_error(cpl)) {
 		bp->bio_error = EIO;
 		bp->bio_flags |= BIO_ERROR;
 		bp->bio_resid = bp->bio_bcount;
@@ -219,6 +219,13 @@ const char *
 nvme_ns_get_model_number(struct nvme_namespace *ns)
 {
 	return ((const char *)ns->ctrlr->cdata.mn);
+}
+
+const struct nvme_namespace_data *
+nvme_ns_get_data(struct nvme_namespace *ns)
+{
+
+	return (&ns->data);
 }
 
 static void
@@ -331,7 +338,7 @@ nvme_ns_construct(struct nvme_namespace *ns, uint16_t id,
 		    nvme_ns_cb, &cpl);
 		status = msleep(&cpl, mtx, PRIBIO, "nvme_start", hz*5);
 		mtx_unlock(mtx);
-		if ((status != 0) || cpl.sf_sc || cpl.sf_sct) {
+		if ((status != 0) || nvme_completion_is_error(&cpl)) {
 			printf("nvme_identify_namespace failed!\n");
 			return (ENXIO);
 		}
@@ -339,11 +346,18 @@ nvme_ns_construct(struct nvme_namespace *ns, uint16_t id,
 	}
 #endif
 
-	if (ctrlr->cdata.oncs.dsm && ns->data.nsfeat.thin_prov)
+	if (ctrlr->cdata.oncs.dsm)
 		ns->flags |= NVME_NS_DEALLOCATE_SUPPORTED;
 
 	if (ctrlr->cdata.vwc.present)
 		ns->flags |= NVME_NS_FLUSH_SUPPORTED;
+
+	/*
+	 * cdev may have already been created, if we are reconstructing the
+	 *  namespace after a controller-level reset.
+	 */
+	if (ns->cdev != NULL)
+		return (0);
 
 /*
  * MAKEDEV_ETERNAL was added in r210923, for cdevs that will never
@@ -361,9 +375,15 @@ nvme_ns_construct(struct nvme_namespace *ns, uint16_t id,
 	    device_get_unit(ctrlr->dev), ns->id);
 #endif
 
-	if (ns->cdev) {
+	if (ns->cdev != NULL)
 		ns->cdev->si_drv1 = ns;
-	}
 
 	return (0);
+}
+
+void nvme_ns_destruct(struct nvme_namespace *ns)
+{
+
+	if (ns->cdev != NULL)
+		destroy_dev(ns->cdev);
 }
