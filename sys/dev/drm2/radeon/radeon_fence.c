@@ -281,7 +281,7 @@ static int radeon_fence_wait_seq(struct radeon_device *rdev, u64 target_seq,
 	uint64_t seq;
 	unsigned i;
 	bool signaled, fence_queue_locked;
-	int r = 0;
+	int r;
 
 	while (target_seq > atomic_load_acq_long(&rdev->fence_drv[ring].last_seq)) {
 		if (!rdev->ring[ring].ready) {
@@ -307,6 +307,7 @@ static int radeon_fence_wait_seq(struct radeon_device *rdev, u64 target_seq,
 #endif /* DUMBBELL_WIP */
 		radeon_irq_kms_sw_irq_get(rdev, ring);
 		fence_queue_locked = false;
+		r = 0;
 		while (!(signaled = radeon_fence_seq_signaled(rdev,
 		    target_seq, ring))) {
 			if (!fence_queue_locked) {
@@ -314,11 +315,11 @@ static int radeon_fence_wait_seq(struct radeon_device *rdev, u64 target_seq,
 				fence_queue_locked = true;
 			}
 			if (intr) {
-				r = -cv_timedwait_sig(&rdev->fence_queue,
+				r = cv_timedwait_sig(&rdev->fence_queue,
 				    &rdev->fence_queue_mtx,
 				    timeout);
 			} else {
-				r = -cv_timedwait(&rdev->fence_queue,
+				r = cv_timedwait(&rdev->fence_queue,
 				    &rdev->fence_queue_mtx,
 				    timeout);
 			}
@@ -329,8 +330,8 @@ static int radeon_fence_wait_seq(struct radeon_device *rdev, u64 target_seq,
 			mtx_unlock(&rdev->fence_queue_mtx);
 		}
 		radeon_irq_kms_sw_irq_put(rdev, ring);
-		if (unlikely(r < 0)) {
-			return r;
+		if (unlikely(r == EINTR || r == ERESTART)) {
+			return -r;
 		}
 #ifdef DUMBBELL_WIP
 		trace_radeon_fence_wait_end(rdev->ddev, seq);
@@ -447,7 +448,7 @@ static int radeon_fence_wait_any_seq(struct radeon_device *rdev,
 	unsigned long timeout, last_activity, tmp;
 	unsigned i, ring = RADEON_NUM_RINGS;
 	bool signaled, fence_queue_locked;
-	int r = 0;
+	int r;
 
 	for (i = 0, last_activity = 0; i < RADEON_NUM_RINGS; ++i) {
 		if (!target_seq[i]) {
@@ -493,6 +494,7 @@ static int radeon_fence_wait_any_seq(struct radeon_device *rdev,
 			}
 		}
 		fence_queue_locked = false;
+		r = 0;
 		while (!(signaled = radeon_fence_any_seq_signaled(rdev,
 		    target_seq))) {
 			if (!fence_queue_locked) {
@@ -500,11 +502,11 @@ static int radeon_fence_wait_any_seq(struct radeon_device *rdev,
 				fence_queue_locked = true;
 			}
 			if (intr) {
-				r = -cv_timedwait_sig(&rdev->fence_queue,
+				r = cv_timedwait_sig(&rdev->fence_queue,
 				    &rdev->fence_queue_mtx,
 				    timeout);
 			} else {
-				r = -cv_timedwait(&rdev->fence_queue,
+				r = cv_timedwait(&rdev->fence_queue,
 				    &rdev->fence_queue_mtx,
 				    timeout);
 			}
@@ -519,8 +521,8 @@ static int radeon_fence_wait_any_seq(struct radeon_device *rdev,
 				radeon_irq_kms_sw_irq_put(rdev, i);
 			}
 		}
-		if (unlikely(r < 0)) {
-			return r;
+		if (unlikely(r == EINTR || r == ERESTART)) {
+			return -r;
 		}
 #ifdef DUMBBELL_WIP
 		trace_radeon_fence_wait_end(rdev->ddev, target_seq[ring]);
