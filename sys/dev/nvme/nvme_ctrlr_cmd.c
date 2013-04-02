@@ -36,7 +36,7 @@ nvme_ctrlr_cmd_identify_controller(struct nvme_controller *ctrlr, void *payload,
 	struct nvme_request *req;
 	struct nvme_command *cmd;
 
-	req = nvme_allocate_request(payload,
+	req = nvme_allocate_request_vaddr(payload,
 	    sizeof(struct nvme_controller_data), cb_fn, cb_arg);
 
 	cmd = &req->cmd;
@@ -58,7 +58,7 @@ nvme_ctrlr_cmd_identify_namespace(struct nvme_controller *ctrlr, uint16_t nsid,
 	struct nvme_request *req;
 	struct nvme_command *cmd;
 
-	req = nvme_allocate_request(payload,
+	req = nvme_allocate_request_vaddr(payload,
 	    sizeof(struct nvme_namespace_data), cb_fn, cb_arg);
 
 	cmd = &req->cmd;
@@ -80,7 +80,7 @@ nvme_ctrlr_cmd_create_io_cq(struct nvme_controller *ctrlr,
 	struct nvme_request *req;
 	struct nvme_command *cmd;
 
-	req = nvme_allocate_request(NULL, 0, cb_fn, cb_arg);
+	req = nvme_allocate_request_null(cb_fn, cb_arg);
 
 	cmd = &req->cmd;
 	cmd->opc = NVME_OPC_CREATE_IO_CQ;
@@ -104,7 +104,7 @@ nvme_ctrlr_cmd_create_io_sq(struct nvme_controller *ctrlr,
 	struct nvme_request *req;
 	struct nvme_command *cmd;
 
-	req = nvme_allocate_request(NULL, 0, cb_fn, cb_arg);
+	req = nvme_allocate_request_null(cb_fn, cb_arg);
 
 	cmd = &req->cmd;
 	cmd->opc = NVME_OPC_CREATE_IO_SQ;
@@ -128,7 +128,7 @@ nvme_ctrlr_cmd_delete_io_cq(struct nvme_controller *ctrlr,
 	struct nvme_request *req;
 	struct nvme_command *cmd;
 
-	req = nvme_allocate_request(NULL, 0, cb_fn, cb_arg);
+	req = nvme_allocate_request_null(cb_fn, cb_arg);
 
 	cmd = &req->cmd;
 	cmd->opc = NVME_OPC_DELETE_IO_CQ;
@@ -149,7 +149,7 @@ nvme_ctrlr_cmd_delete_io_sq(struct nvme_controller *ctrlr,
 	struct nvme_request *req;
 	struct nvme_command *cmd;
 
-	req = nvme_allocate_request(NULL, 0, cb_fn, cb_arg);
+	req = nvme_allocate_request_null(cb_fn, cb_arg);
 
 	cmd = &req->cmd;
 	cmd->opc = NVME_OPC_DELETE_IO_SQ;
@@ -171,7 +171,7 @@ nvme_ctrlr_cmd_set_feature(struct nvme_controller *ctrlr, uint8_t feature,
 	struct nvme_request *req;
 	struct nvme_command *cmd;
 
-	req = nvme_allocate_request(NULL, 0, cb_fn, cb_arg);
+	req = nvme_allocate_request_null(cb_fn, cb_arg);
 
 	cmd = &req->cmd;
 	cmd->opc = NVME_OPC_SET_FEATURES;
@@ -189,7 +189,7 @@ nvme_ctrlr_cmd_get_feature(struct nvme_controller *ctrlr, uint8_t feature,
 	struct nvme_request *req;
 	struct nvme_command *cmd;
 
-	req = nvme_allocate_request(NULL, 0, cb_fn, cb_arg);
+	req = nvme_allocate_request_null(cb_fn, cb_arg);
 
 	cmd = &req->cmd;
 	cmd->opc = NVME_OPC_GET_FEATURES;
@@ -230,15 +230,15 @@ nvme_ctrlr_cmd_set_interrupt_coalescing(struct nvme_controller *ctrlr,
 	uint32_t cdw11;
 
 	if ((microseconds/100) >= 0x100) {
-		KASSERT(FALSE, ("intr coal time > 255*100 microseconds\n"));
-		printf("invalid coal time %d, disabling\n", microseconds);
+		nvme_printf(ctrlr, "invalid coal time %d, disabling\n",
+		    microseconds);
 		microseconds = 0;
 		threshold = 0;
 	}
 
 	if (threshold >= 0x100) {
-		KASSERT(FALSE, ("intr threshold > 255\n"));
-		printf("invalid threshold %d, disabling\n", threshold);
+		nvme_printf(ctrlr, "invalid threshold %d, disabling\n",
+		    threshold);
 		threshold = 0;
 		microseconds = 0;
 	}
@@ -256,7 +256,7 @@ nvme_ctrlr_cmd_get_log_page(struct nvme_controller *ctrlr, uint8_t log_page,
 	struct nvme_request *req;
 	struct nvme_command *cmd;
 
-	req = nvme_allocate_request(payload, payload_size, cb_fn, cb_arg);
+	req = nvme_allocate_request_vaddr(payload, payload_size, cb_fn, cb_arg);
 
 	cmd = &req->cmd;
 	cmd->opc = NVME_OPC_GET_LOG_PAGE;
@@ -276,11 +276,12 @@ nvme_ctrlr_cmd_get_error_page(struct nvme_controller *ctrlr,
 	KASSERT(num_entries > 0, ("%s called with num_entries==0\n", __func__));
 
 	/* Controller's error log page entries is 0-based. */
-	if (num_entries > (ctrlr->cdata.elpe + 1)) {
-		printf("%s num_entries=%d cdata.elpe=%d\n",
-		    __func__, num_entries, ctrlr->cdata.elpe);
+	KASSERT(num_entries <= (ctrlr->cdata.elpe + 1),
+	    ("%s called with num_entries=%d but (elpe+1)=%d\n", __func__,
+	    num_entries, ctrlr->cdata.elpe + 1));
+
+	if (num_entries > (ctrlr->cdata.elpe + 1))
 		num_entries = ctrlr->cdata.elpe + 1;
-	}
 
 	nvme_ctrlr_cmd_get_log_page(ctrlr, NVME_LOG_ERROR,
 	    NVME_GLOBAL_NAMESPACE_TAG, payload, sizeof(*payload) * num_entries,
@@ -314,7 +315,7 @@ nvme_ctrlr_cmd_abort(struct nvme_controller *ctrlr, uint16_t cid,
 	struct nvme_request *req;
 	struct nvme_command *cmd;
 
-	req = nvme_allocate_request(NULL, 0, cb_fn, cb_arg);
+	req = nvme_allocate_request_null(cb_fn, cb_arg);
 
 	cmd = &req->cmd;
 	cmd->opc = NVME_OPC_ABORT;

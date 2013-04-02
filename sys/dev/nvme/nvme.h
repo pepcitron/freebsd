@@ -733,6 +733,7 @@ typedef void *(*nvme_cons_ns_fn_t)(struct nvme_namespace *, void *);
 typedef void *(*nvme_cons_ctrlr_fn_t)(struct nvme_controller *);
 typedef void (*nvme_cons_async_fn_t)(void *, const struct nvme_completion *,
 				     uint32_t, void *, uint32_t);
+typedef void (*nvme_cons_fail_fn_t)(void *);
 
 enum nvme_namespace_flags {
 	NVME_NS_DEALLOCATE_SUPPORTED	= 0x1,
@@ -757,9 +758,13 @@ void	nvme_ctrlr_cmd_get_log_page(struct nvme_controller *ctrlr,
 int	nvme_ns_cmd_write(struct nvme_namespace *ns, void *payload,
 			  uint64_t lba, uint32_t lba_count, nvme_cb_fn_t cb_fn,
 			  void *cb_arg);
+int	nvme_ns_cmd_write_bio(struct nvme_namespace *ns, struct bio *bp,
+			      nvme_cb_fn_t cb_fn, void *cb_arg);
 int	nvme_ns_cmd_read(struct nvme_namespace *ns, void *payload,
 			 uint64_t lba, uint32_t lba_count, nvme_cb_fn_t cb_fn,
 			 void *cb_arg);
+int	nvme_ns_cmd_read_bio(struct nvme_namespace *ns, struct bio *bp,
+			      nvme_cb_fn_t cb_fn, void *cb_arg);
 int	nvme_ns_cmd_deallocate(struct nvme_namespace *ns, void *payload,
 			       uint8_t num_ranges, nvme_cb_fn_t cb_fn,
 			       void *cb_arg);
@@ -769,7 +774,8 @@ int	nvme_ns_cmd_flush(struct nvme_namespace *ns, nvme_cb_fn_t cb_fn,
 /* Registration functions */
 struct nvme_consumer *	nvme_register_consumer(nvme_cons_ns_fn_t    ns_fn,
 					       nvme_cons_ctrlr_fn_t ctrlr_fn,
-					       nvme_cons_async_fn_t async_fn);
+					       nvme_cons_async_fn_t async_fn,
+					       nvme_cons_fail_fn_t  fail_fn);
 void		nvme_unregister_consumer(struct nvme_consumer *consumer);
 
 /* Controller helper functions */
