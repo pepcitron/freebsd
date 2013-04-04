@@ -411,11 +411,7 @@ static void		adasuspend(void *arg);
 static void		adaresume(void *arg);
 
 #ifndef	ADA_DEFAULT_LEGACY_ALIASES
-#ifdef ATA_CAM
 #define	ADA_DEFAULT_LEGACY_ALIASES	1
-#else
-#define	ADA_DEFAULT_LEGACY_ALIASES	0
-#endif
 #endif
 
 #ifndef ADA_DEFAULT_TIMEOUT
@@ -1886,6 +1882,7 @@ adaflush(void)
 		    softc->disk->d_devstat);
 		if (error != 0)
 			xpt_print(periph->path, "Synchronize cache failed\n");
+		xpt_release_ccb(ccb);
 		cam_periph_unlock(periph);
 	}
 }
@@ -1931,6 +1928,7 @@ adaspindown(uint8_t cmd, int flags)
 		    softc->disk->d_devstat);
 		if (error != 0)
 			xpt_print(periph->path, "Spin-down disk failed\n");
+		xpt_release_ccb(ccb);
 		cam_periph_unlock(periph);
 	}
 }
