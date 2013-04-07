@@ -51,13 +51,18 @@ static bool igp_read_bios_from_vram(struct radeon_device *rdev)
 	resource_size_t vram_base;
 	resource_size_t size = 256 * 1024; /* ??? */
 
+	DRM_INFO("%s: ===> Try IGP's VRAM...\n", __func__);
+
 	if (!(rdev->flags & RADEON_IS_IGP))
-		if (!radeon_card_posted(rdev))
+		if (!radeon_card_posted(rdev)) {
+			DRM_INFO("%s: not POSTed discrete card detected, skipping this method...\n",
+			    __func__);
 			return false;
+		}
 
 	rdev->bios = NULL;
 	vram_base = drm_get_resource_start(rdev->ddev, 0);
-	DRM_INFO("%s: vram_base=0x%016lx\n", __func__, vram_base);
+	DRM_INFO("%s: VRAM base address: 0x%lx\n", __func__, vram_base);
 
 	bios_map.offset = vram_base;
 	bios_map.size   = size;
@@ -71,7 +76,7 @@ static bool igp_read_bios_from_vram(struct radeon_device *rdev)
 	}
 	bios = bios_map.virtual;
 	size = bios_map.size;
-	DRM_INFO("%s: base=%p, size=%lu\n", __func__, bios, size);
+	DRM_INFO("%s: Map address: %p (%lu bytes)\n", __func__, bios, size);
 
 	if (size == 0 || bios[0] != 0x55 || bios[1] != 0xaa) {
 		if (size == 0) {
@@ -102,6 +107,8 @@ static bool radeon_read_bios(struct radeon_device *rdev)
 	size_t size;
 	bool found;
 
+	DRM_INFO("%s: ===> Try PCI Expansion ROM...\n", __func__);
+
 	found = false;
 	rdev->bios = NULL;
 	/* XXX: some cards may return 0 for rom size? ddx has a workaround */
@@ -115,12 +122,15 @@ static bool radeon_read_bios(struct radeon_device *rdev)
 	size = pci_read_config(rdev->dev, bios_rid, 4);
 	size &= 0xfffff800;
 	size = size & (~size + 1);
-	DRM_INFO("%s: size (read from BAR): %lu bytes\n", __func__, size);
+	DRM_INFO("%s: Size (read from BAR): %lu bytes\n", __func__, size);
 
-	/* Allocate the Expansion ROM from the grand-father device. */
-	vga = device_get_parent(rdev->dev);
-	bios_res = BUS_ALLOC_RESOURCE(device_get_parent(vga), rdev->dev,
-	    SYS_RES_MEMORY, &bios_rid, 0, ~0, size, RF_ACTIVE);
+	bios_res = NULL;
+	if (size > 0) {
+		/* Allocate the Expansion ROM from the grand-father device. */
+		vga = device_get_parent(rdev->dev);
+		bios_res = BUS_ALLOC_RESOURCE(device_get_parent(vga), rdev->dev,
+		    SYS_RES_MEMORY, &bios_rid, 0, ~0, size, RF_ACTIVE);
+	}
 
 	if (bios_res != NULL) {
 		/*
@@ -135,15 +145,15 @@ static bool radeon_read_bios(struct radeon_device *rdev)
 		size = rman_get_size(bios_res);
 	} else {
 		/* Shadowed Video VIOS. */
-		DRM_INFO("%s: Shadowed Video BIOS\n", __func__);
+		DRM_INFO("%s: Fallback on shadowed Video BIOS at 0xC000\n", __func__);
 		size = 131072;
 		bios = (uint8_t *)pmap_mapbios(0xC0000, size);
 		if (!bios) {
-			DRM_INFO("%s: failed to map shadowed bios\n", __func__);
+			DRM_INFO("%s: Failed to map shadowed bios\n", __func__);
 			return false;
 		}
 	}
-	DRM_INFO("%s: start=%p size=%lu bytes\n", __func__, bios, size);
+	DRM_INFO("%s: Map address: %p (%lu bytes)\n", __func__, bios, size);
 
 	if (size == 0 || bios[0] != 0x55 || bios[1] != 0xaa) {
 		if (size == 0) {
@@ -232,17 +242,20 @@ static bool radeon_atrm_get_bios(struct radeon_device *rdev)
 	ACPI_STATUS status;
 	bool found = false;
 
+	DRM_INFO("%s: ===> Try ATRM...\n", __func__);
+
 	/* ATRM is for the discrete card only */
-	DRM_INFO("%s: IGP?\n", __func__);
-	if (rdev->flags & RADEON_IS_IGP)
+	if (rdev->flags & RADEON_IS_IGP) {
+		DRM_INFO("%s: IGP card detected, skipping this method...\n",
+		    __func__);
 		return false;
+	}
 
 #ifdef DUMBBELL_WIP
 	while ((pdev = pci_get_class(PCI_CLASS_DISPLAY_VGA << 8, pdev)) != NULL) {
 #endif /* DUMBBELL_WIP */
-	DRM_INFO("%s: pci_find_class\n", __func__);
 	if ((dev = pci_find_class(PCIC_DISPLAY, PCIS_DISPLAY_VGA)) != NULL) {
-		DRM_INFO("%s: %d:%d:%d:%d, vendor=%04x, device=%04x\n",
+		DRM_INFO("%s: pci_find_class() found: %d:%d:%d:%d, vendor=%04x, device=%04x\n",
 		    __func__,
 		    pci_get_domain(dev),
 		    pci_get_bus(dev),
@@ -250,7 +263,7 @@ static bool radeon_atrm_get_bios(struct radeon_device *rdev)
 		    pci_get_function(dev),
 		    pci_get_vendor(dev),
 		    pci_get_device(dev));
-		DRM_INFO("%s: acpi_get_handle\n", __func__);
+		DRM_INFO("%s: Get ACPI device handle\n", __func__);
 		dhandle = acpi_get_handle(dev);
 #ifdef DUMBBELL_WIP
 		if (!dhandle)
@@ -259,7 +272,7 @@ static bool radeon_atrm_get_bios(struct radeon_device *rdev)
 		if (!dhandle)
 			return false;
 
-		DRM_INFO("%s: AcpiGetHandle\n", __func__);
+		DRM_INFO("%s: Get ACPI handle for \"ATRM\"\n", __func__);
 		status = AcpiGetHandle(dhandle, "ATRM", &atrm_handle);
 		if (!ACPI_FAILURE(status)) {
 			found = true;
@@ -267,7 +280,7 @@ static bool radeon_atrm_get_bios(struct radeon_device *rdev)
 			break;
 #endif /* DUMBBELL_WIP */
 		} else {
-			DRM_INFO("%s: ACPI_FAILURE: %s\n",
+			DRM_INFO("%s: Failed to get \"ATRM\" handle: %s\n",
 			    __func__, AcpiFormatException(status));
 		}
 	}
@@ -282,7 +295,7 @@ static bool radeon_atrm_get_bios(struct radeon_device *rdev)
 	}
 
 	for (i = 0; i < size / ATRM_BIOS_PAGE; i++) {
-		DRM_INFO("%s: radeon_atrm_call\n", __func__);
+		DRM_INFO("%s: Call radeon_atrm_call()\n", __func__);
 		ret = radeon_atrm_call(atrm_handle,
 				       rdev->bios,
 				       (i * ATRM_BIOS_PAGE),
@@ -312,6 +325,8 @@ static bool ni_read_disabled_bios(struct radeon_device *rdev)
 	u32 vga_render_control;
 	u32 rom_cntl;
 	bool r;
+
+	DRM_INFO("%s: ===> Try disabled BIOS (ni)...\n", __func__);
 
 	bus_cntl = RREG32(R600_BUS_CNTL);
 	d1vga_control = RREG32(AVIVO_D1VGA_CONTROL);
@@ -354,6 +369,8 @@ static bool r700_read_disabled_bios(struct radeon_device *rdev)
 	uint32_t cg_spll_func_cntl = 0;
 	uint32_t cg_spll_status;
 	bool r;
+
+	DRM_INFO("%s: ===> Try disabled BIOS (r700)...\n", __func__);
 
 	viph_control = RREG32(RADEON_VIPH_CONTROL);
 	bus_cntl = RREG32(R600_BUS_CNTL);
@@ -427,6 +444,8 @@ static bool r600_read_disabled_bios(struct radeon_device *rdev)
 	uint32_t ctxsw_vid_lower_gpio_cntl;
 	uint32_t lower_gpio_enable;
 	bool r;
+
+	DRM_INFO("%s: ===> Try disabled BIOS (r600)...\n", __func__);
 
 	viph_control = RREG32(RADEON_VIPH_CONTROL);
 	bus_cntl = RREG32(R600_BUS_CNTL);
@@ -502,6 +521,8 @@ static bool avivo_read_disabled_bios(struct radeon_device *rdev)
 	uint32_t gpiopad_mask;
 	bool r;
 
+	DRM_INFO("%s: ===> Try disabled BIOS (avivo)...\n", __func__);
+
 	seprom_cntl1 = RREG32(RADEON_SEPROM_CNTL1);
 	viph_control = RREG32(RADEON_VIPH_CONTROL);
 	bus_cntl = RREG32(RV370_BUS_CNTL);
@@ -560,6 +581,8 @@ static bool legacy_read_disabled_bios(struct radeon_device *rdev)
 	uint32_t crtc_ext_cntl;
 	uint32_t fp2_gen_cntl;
 	bool r;
+
+	DRM_INFO("%s: ===> Try disabled BIOS (legacy)...\n", __func__);
 
 	seprom_cntl1 = RREG32(RADEON_SEPROM_CNTL1);
 	viph_control = RREG32(RADEON_VIPH_CONTROL);
@@ -661,10 +684,13 @@ static bool radeon_acpi_vfct_bios(struct radeon_device *rdev)
 	VFCT_IMAGE_HEADER *vhdr;
 	ACPI_STATUS status;
 
-	DRM_INFO("VFCT: AcpiGetTable\n");
+	DRM_INFO("%s: ===> Try VFCT...\n", __func__);
+
+	DRM_INFO("%s: Get \"VFCT\" ACPI table\n", __func__);
 	status = AcpiGetTable("VFCT", 1, &hdr);
 	if (!ACPI_SUCCESS(status)) {
-		DRM_INFO("VFCT: ACPI_FAILURE: %s\n", AcpiFormatException(status));
+		DRM_INFO("%s: Failed to get \"VFCT\" table: %s\n",
+		    __func__, AcpiFormatException(status));
 		return false;
 	}
 	tbl_size = hdr->Length;
@@ -712,24 +738,15 @@ bool radeon_get_bios(struct radeon_device *rdev)
 	bool r;
 	uint16_t tmp;
 
-	DRM_INFO("%s: ATRM\n", __func__);
 	r = radeon_atrm_get_bios(rdev);
-	if (r == false) {
-		DRM_INFO("%s: VFCT\n", __func__);
+	if (r == false)
 		r = radeon_acpi_vfct_bios(rdev);
-	}
-	if (r == false) {
-		DRM_INFO("%s: IGP\n", __func__);
+	if (r == false)
 		r = igp_read_bios_from_vram(rdev);
-	}
-	if (r == false) {
-		DRM_INFO("%s: read BIOS\n", __func__);
+	if (r == false)
 		r = radeon_read_bios(rdev);
-	}
-	if (r == false) {
-		DRM_INFO("%s: read disabled BIOS\n", __func__);
+	if (r == false)
 		r = radeon_read_disabled_bios(rdev);
-	}
 	if (r == false || rdev->bios == NULL) {
 		DRM_ERROR("Unable to locate a BIOS ROM\n");
 		rdev->bios = NULL;
