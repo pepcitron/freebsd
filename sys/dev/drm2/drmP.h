@@ -1579,7 +1579,7 @@ static inline uint32_t ror32(uint32_t word, unsigned int shift)
 	return (word >> shift) | (word << (32 - shift));
 }
 
-#define	IS_ALIGNED(x, y)	(((x) & ~((y) - 1)) == 0)
+#define	IS_ALIGNED(x, y)	(((x) & ((y) - 1)) == 0)
 #define	get_unaligned(ptr)                                              \
 	({ __typeof__(*(ptr)) __tmp;                                    \
 	  memcpy(&__tmp, (ptr), sizeof(*(ptr))); __tmp; })
