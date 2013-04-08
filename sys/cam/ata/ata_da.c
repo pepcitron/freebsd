@@ -28,7 +28,6 @@
 __FBSDID("$FreeBSD$");
 
 #include "opt_ada.h"
-#include "opt_ata.h"
 
 #include <sys/param.h>
 
@@ -75,18 +74,19 @@ typedef enum {
 } ada_state;
 
 typedef enum {
-	ADA_FLAG_PACK_INVALID	= 0x001,
-	ADA_FLAG_CAN_48BIT	= 0x002,
-	ADA_FLAG_CAN_FLUSHCACHE	= 0x004,
-	ADA_FLAG_CAN_NCQ	= 0x008,
-	ADA_FLAG_CAN_DMA	= 0x010,
-	ADA_FLAG_NEED_OTAG	= 0x020,
-	ADA_FLAG_WENT_IDLE	= 0x040,
-	ADA_FLAG_CAN_TRIM	= 0x080,
-	ADA_FLAG_OPEN		= 0x100,
-	ADA_FLAG_SCTX_INIT	= 0x200,
-	ADA_FLAG_CAN_CFA        = 0x400,
-	ADA_FLAG_CAN_POWERMGT   = 0x800
+	ADA_FLAG_PACK_INVALID	= 0x0001,
+	ADA_FLAG_CAN_48BIT	= 0x0002,
+	ADA_FLAG_CAN_FLUSHCACHE	= 0x0004,
+	ADA_FLAG_CAN_NCQ	= 0x0008,
+	ADA_FLAG_CAN_DMA	= 0x0010,
+	ADA_FLAG_NEED_OTAG	= 0x0020,
+	ADA_FLAG_WENT_IDLE	= 0x0040,
+	ADA_FLAG_CAN_TRIM	= 0x0080,
+	ADA_FLAG_OPEN		= 0x0100,
+	ADA_FLAG_SCTX_INIT	= 0x0200,
+	ADA_FLAG_CAN_CFA        = 0x0400,
+	ADA_FLAG_CAN_POWERMGT   = 0x0800,
+	ADA_FLAG_CAN_DMA48	= 0x1000
 } ada_flags;
 
 typedef enum {
@@ -527,10 +527,6 @@ adaopen(struct disk *dp)
 	int error;
 
 	periph = (struct cam_periph *)dp->d_drv1;
-	if (periph == NULL) {
-		return (ENXIO);	
-	}
-
 	if (cam_periph_acquire(periph) != CAM_REQ_CMP) {
 		return(ENXIO);
 	}
@@ -566,9 +562,6 @@ adaclose(struct disk *dp)
 	union ccb *ccb;
 
 	periph = (struct cam_periph *)dp->d_drv1;
-	if (periph == NULL)
-		return (ENXIO);	
-
 	cam_periph_lock(periph);
 	if (cam_periph_hold(periph, PRIBIO) != 0) {
 		cam_periph_unlock(periph);
@@ -620,6 +613,9 @@ adaschedule(struct cam_periph *periph)
 	struct ada_softc *softc = (struct ada_softc *)periph->softc;
 	uint32_t prio;
 
+	if (softc->state != ADA_STATE_NORMAL)
+		return;
+
 	/* Check if cam_periph_getccb() was called. */
 	prio = periph->immediate_priority;
 
@@ -646,10 +642,6 @@ adastrategy(struct bio *bp)
 	struct ada_softc *softc;
 	
 	periph = (struct cam_periph *)bp->bio_disk->d_drv1;
-	if (periph == NULL) {
-		biofinish(bp, NULL, ENXIO);
-		return;
-	}
 	softc = (struct ada_softc *)periph->softc;
 
 	cam_periph_lock(periph);
@@ -704,8 +696,6 @@ adadump(void *arg, void *virtual, vm_offset_t physical, off_t offset, size_t len
 
 	dp = arg;
 	periph = dp->d_drv1;
-	if (periph == NULL)
-		return (ENXIO);
 	softc = (struct ada_softc *)periph->softc;
 	cam_periph_lock(periph);
 	secsize = softc->params.secsize;
@@ -912,6 +902,15 @@ adaasync(void *callback_arg, u_int32_t code,
 			softc->flags |= ADA_FLAG_CAN_DMA;
 		else
 			softc->flags &= ~ADA_FLAG_CAN_DMA;
+		if (cgd.ident_data.support.command2 & ATA_SUPPORT_ADDRESS48) {
+			softc->flags |= ADA_FLAG_CAN_48BIT;
+			if (cgd.inq_flags & SID_DMA48)
+				softc->flags |= ADA_FLAG_CAN_DMA48;
+			else
+				softc->flags &= ~ADA_FLAG_CAN_DMA48;
+		} else
+			softc->flags &= ~(ADA_FLAG_CAN_48BIT |
+			    ADA_FLAG_CAN_DMA48);
 		if ((cgd.ident_data.satacapabilities & ATA_SUPPORT_NCQ) &&
 		    (cgd.inq_flags & SID_DMA) && (cgd.inq_flags & SID_CmdQue))
 			softc->flags |= ADA_FLAG_CAN_NCQ;
@@ -1038,9 +1037,6 @@ adagetattr(struct bio *bp)
 	struct cam_periph *periph;
 
 	periph = (struct cam_periph *)bp->bio_disk->d_drv1;
-	if (periph == NULL)
-		return (ENXIO);
-
 	cam_periph_lock(periph);
 	ret = xpt_getattr(bp->bio_data, bp->bio_length, bp->bio_attribute,
 	    periph->path);
@@ -1083,8 +1079,11 @@ adaregister(struct cam_periph *periph, void *arg)
 	if ((cgd->ident_data.capabilities1 & ATA_SUPPORT_DMA) &&
 	    (cgd->inq_flags & SID_DMA))
 		softc->flags |= ADA_FLAG_CAN_DMA;
-	if (cgd->ident_data.support.command2 & ATA_SUPPORT_ADDRESS48)
+	if (cgd->ident_data.support.command2 & ATA_SUPPORT_ADDRESS48) {
 		softc->flags |= ADA_FLAG_CAN_48BIT;
+		if (cgd->inq_flags & SID_DMA48)
+			softc->flags |= ADA_FLAG_CAN_DMA48;
+	}
 	if (cgd->ident_data.support.command2 & ATA_SUPPORT_FLUSHCACHE)
 		softc->flags |= ADA_FLAG_CAN_FLUSHCACHE;
 	if (cgd->ident_data.support.command1 & ATA_SUPPORT_POWERMGT)
@@ -1130,7 +1129,7 @@ adaregister(struct cam_periph *periph, void *arg)
 	 * Register this media as a disk
 	 */
 	(void)cam_periph_hold(periph, PRIBIO);
-	mtx_unlock(periph->sim->mtx);
+	cam_periph_unlock(periph);
 	snprintf(announce_buf, sizeof(announce_buf),
 	    "kern.cam.ada.%d.quirks", periph->unit_number);
 	quirks = softc->quirks;
@@ -1224,7 +1223,7 @@ adaregister(struct cam_periph *periph, void *arg)
 	} else
 		legacy_id = -1;
 	disk_create(softc->disk, DISK_VERSION);
-	mtx_lock(periph->sim->mtx);
+	cam_periph_lock(periph);
 	cam_periph_unhold(periph);
 
 	dp = &softc->params;
@@ -1471,7 +1470,7 @@ adastart(struct cam_periph *periph, union ccb *start_ccb)
 			} else if ((softc->flags & ADA_FLAG_CAN_48BIT) &&
 			    (lba + count >= ATA_MAX_28BIT_LBA ||
 			    count > 256)) {
-				if (softc->flags & ADA_FLAG_CAN_DMA) {
+				if (softc->flags & ADA_FLAG_CAN_DMA48) {
 					if (bp->bio_cmd == BIO_READ) {
 						ata_48bit_cmd(ataio, ATA_READ_DMA48,
 						    0, lba, count);
