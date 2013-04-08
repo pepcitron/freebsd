@@ -582,12 +582,12 @@ static int drm_load(struct drm_device *dev)
 		/* Shared code returns -errno. */
 		retcode = -dev->driver->load(dev,
 		    dev->id_entry->driver_private);
-		DRM_INFO("dumbbell@: driver->load: %d\n", retcode);
+		DRM_INFO("driver->load returned: %d\n", retcode);
 		if (pci_enable_busmaster(dev->device))
 			DRM_ERROR("Request to enable bus-master failed.\n");
 		DRM_UNLOCK(dev);
 		if (retcode != 0)
-			goto error;
+			goto error1;
 	}
 
 	DRM_INFO("Initialized %s %d.%d.%d %s\n",
@@ -601,8 +601,8 @@ static int drm_load(struct drm_device *dev)
 
 error1:
 	delete_unrhdr(dev->drw_unrhdr);
-error:
 	drm_gem_destroy(dev);
+error:
 	drm_ctxbitmap_cleanup(dev);
 	drm_sysctl_cleanup(dev);
 	DRM_LOCK(dev);
