@@ -453,6 +453,9 @@ rman_reserve_resource_bound(struct rman *rm, u_long start, u_long end,
 	want_activate = (flags & RF_ACTIVE);
 	flags &= ~RF_ACTIVE;
 
+	if (count == 0)
+		return (NULL);
+
 	mtx_lock(rm->rm_mtx);
 
 	for (r = TAILQ_FIRST(&rm->rm_list);
