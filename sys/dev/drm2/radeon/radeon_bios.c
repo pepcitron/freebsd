@@ -100,42 +100,16 @@ static bool igp_read_bios_from_vram(struct radeon_device *rdev)
 
 static bool radeon_read_bios(struct radeon_device *rdev)
 {
-	struct resource *bios_res;
-	int bios_rid;
 	uint8_t __iomem *bios;
 	size_t size;
-	bool found;
 
 	DRM_INFO("%s: ===> Try PCI Expansion ROM...\n", __func__);
 
-	found = false;
 	rdev->bios = NULL;
 	/* XXX: some cards may return 0 for rom size? ddx has a workaround */
-	bios_rid = PCIR_BIOS;
-
-	bios_res = bus_alloc_resource_any(rdev->dev, SYS_RES_MEMORY, &bios_rid,
-	    RF_ACTIVE);
-
-	if (bios_res != NULL) {
-		/*
-		 * We now have the physical address: we must write it to
-		 * the Expansion ROM BAR and enable it.
-		 */
-		uint32_t start = rman_get_start(bios_res);
-		DRM_INFO("%s: Expansion ROM mapped\n", __func__);
-		pci_write_config(rdev->dev, bios_rid, start | 0x1, 4);
-
-		bios = rman_get_virtual(bios_res);
-		size = rman_get_size(bios_res);
-	} else {
-		/* Shadowed Video VIOS. */
-		DRM_INFO("%s: Fallback on shadowed Video BIOS at 0xC000\n", __func__);
-		size = 131072;
-		bios = (uint8_t *)pmap_mapbios(0xC0000, size);
-		if (!bios) {
-			DRM_INFO("%s: Failed to map shadowed bios\n", __func__);
-			return false;
-		}
+	bios = vga_pci_map_bios(rdev->dev, &size);
+	if (!bios) {
+		return false;
 	}
 	DRM_INFO("%s: Map address: %p (%lu bytes)\n", __func__, bios, size);
 
@@ -146,25 +120,12 @@ static bool radeon_read_bios(struct radeon_device *rdev)
 			DRM_INFO("%s: Incorrect BIOS signature: 0x%02X%02X\n",
 			    __func__, bios[0], bios[1]);
 		}
-		goto error;
+		vga_pci_unmap_bios(rdev->dev, bios);
 	}
-
 	rdev->bios = malloc(size, DRM_MEM_DRIVER, M_WAITOK);
-	if (rdev->bios == NULL) {
-		goto error;
-	}
-
-	found = true;
 	memcpy(rdev->bios, bios, size);
-
-error:
-	if (bios_res != NULL) {
-		bus_deactivate_resource(rdev->dev, SYS_RES_MEMORY, bios_rid, bios_res);
-		bus_release_resource(rdev->dev, SYS_RES_MEMORY, bios_rid, bios_res);
-	} else {
-		pmap_unmapdev((vm_offset_t)bios, size);
-	}
-	return found;
+	vga_pci_unmap_bios(rdev->dev, bios);
+	return true;
 }
 
 /* ATRM is used to get the BIOS on the discrete cards in
@@ -727,8 +688,9 @@ bool radeon_get_bios(struct radeon_device *rdev)
 		r = igp_read_bios_from_vram(rdev);
 	if (r == false)
 		r = radeon_read_bios(rdev);
-	if (r == false)
+	if (r == false) {
 		r = radeon_read_disabled_bios(rdev);
+	}
 	if (r == false || rdev->bios == NULL) {
 		DRM_ERROR("Unable to locate a BIOS ROM\n");
 		rdev->bios = NULL;
