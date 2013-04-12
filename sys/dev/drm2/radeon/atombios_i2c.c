@@ -60,7 +60,7 @@ static int radeon_process_i2c_ch(struct radeon_i2c_chan *chan,
 	if (flags & HW_I2C_WRITE) {
 		if (num > ATOM_MAX_HW_I2C_WRITE) {
 			DRM_ERROR("hw i2c: tried to write too many bytes (%d vs 2)\n", num);
-			return -EINVAL;
+			return EINVAL;
 		}
 		memcpy(&out, buf, num);
 		args.lpI2CDataOut = cpu_to_le16(out);
@@ -77,7 +77,7 @@ static int radeon_process_i2c_ch(struct radeon_i2c_chan *chan,
 	/* error */
 	if (args.ucStatus != HW_ASSISTED_I2C_STATUS_SUCCESS) {
 		DRM_DEBUG_KMS("hw_i2c error\n");
-		return -EIO;
+		return EIO;
 	}
 
 	if (!(flags & HW_I2C_WRITE))
@@ -103,7 +103,7 @@ radeon_atom_hw_i2c_xfer(device_t dev, struct iic_msg *msgs, u_int num)
 		if (ret)
 			return ret;
 		else
-			return num;
+			return (0);
 	}
 
 	for (i = 0; i < num; i++) {
@@ -133,7 +133,7 @@ radeon_atom_hw_i2c_xfer(device_t dev, struct iic_msg *msgs, u_int num)
 		}
 	}
 
-	return num;
+	return (0);
 }
 
 static int
