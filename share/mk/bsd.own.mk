@@ -230,9 +230,6 @@ WITHOUT_${var}=
 .if defined(YES_HESIOD)
 WITH_HESIOD=
 .endif
-.if defined(MAKE_IDEA)
-WITH_IDEA=
-.endif
 
 __DEFAULT_YES_OPTIONS = \
     ACCT \
@@ -254,6 +251,7 @@ __DEFAULT_YES_OPTIONS = \
     BIND_UTILS \
     BINUTILS \
     BLUETOOTH \
+    BMAKE \
     BOOT \
     BSD_CPIO \
     BSNMP \
@@ -262,6 +260,7 @@ __DEFAULT_YES_OPTIONS = \
     CAPSICUM \
     CDDL \
     CPP \
+    CROSS_COMPILER \
     CRYPT \
     CTM \
     CVS \
@@ -271,6 +270,7 @@ __DEFAULT_YES_OPTIONS = \
     ED_CRYPTO \
     EXAMPLES \
     FLOPPY \
+    FORMAT_EXTENSIONS \
     FORTH \
     FP_LIBC \
     FREEBSD_UPDATE \
@@ -361,7 +361,6 @@ __DEFAULT_NO_OPTIONS = \
     BIND_LIBS \
     BIND_SIGCHASE \
     BIND_XML \
-    BMAKE \
     BSDCONFIG \
     BSD_GREP \
     CLANG_EXTRAS \
@@ -369,7 +368,6 @@ __DEFAULT_NO_OPTIONS = \
     GPL_DTC \
     HESIOD \
     ICONV \
-    IDEA \
     INSTALL_AS_USER \
     LDNS_UTILS \
     NMTREE \

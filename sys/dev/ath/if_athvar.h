@@ -178,10 +178,11 @@ struct ath_node {
 	struct ath_buf	*an_ff_buf[WME_NUM_AC]; /* ff staging area */
 	struct ath_tid	an_tid[IEEE80211_TID_SIZE];	/* per-TID state */
 	char		an_name[32];	/* eg "wlan0_a1" */
-	struct mtx	an_mtx;		/* protecting the ath_node state */
+	struct mtx	an_mtx;		/* protecting the rate control state */
 	uint32_t	an_swq_depth;	/* how many SWQ packets for this
 					   node */
 	int			clrdmask;	/* has clrdmask been set */
+	uint32_t	an_leak_count;	/* How many frames to leak during pause */
 	/* variable-length rate control state follows */
 };
 #define	ATH_NODE(ni)	((struct ath_node *)(ni))
@@ -326,7 +327,8 @@ struct ath_txq {
 #define	ATH_TXQ_SWQ	(HAL_NUM_TX_QUEUES+1)	/* qnum for s/w only queue */
 	u_int			axq_ac;		/* WME AC */
 	u_int			axq_flags;
-#define	ATH_TXQ_PUTPENDING	0x0001		/* ath_hal_puttxbuf pending */
+//#define	ATH_TXQ_PUTPENDING	0x0001		/* ath_hal_puttxbuf pending */
+#define	ATH_TXQ_PUTRUNNING	0x0002		/* ath_hal_puttxbuf has been called */
 	u_int			axq_depth;	/* queue depth (stat only) */
 	u_int			axq_aggr_depth;	/* how many aggregates are queued */
 	u_int			axq_intrcnt;	/* interrupt count */
@@ -381,6 +383,8 @@ struct ath_txq {
 #define	ATH_TXQ_LOCK(_tq)		mtx_lock(&(_tq)->axq_lock)
 #define	ATH_TXQ_UNLOCK(_tq)		mtx_unlock(&(_tq)->axq_lock)
 #define	ATH_TXQ_LOCK_ASSERT(_tq)	mtx_assert(&(_tq)->axq_lock, MA_OWNED)
+#define	ATH_TXQ_UNLOCK_ASSERT(_tq)	mtx_assert(&(_tq)->axq_lock,	\
+					    MA_NOTOWNED)
 
 
 #define	ATH_NODE_LOCK(_an)		mtx_lock(&(_an)->an_mtx)
@@ -413,17 +417,17 @@ struct ath_txq {
 #define ATH_TID_INSERT_HEAD(_tq, _elm, _field) do { \
 	TAILQ_INSERT_HEAD(&(_tq)->tid_q, (_elm), _field); \
 	(_tq)->axq_depth++; \
-	atomic_add_rel_32( &((_tq)->an)->an_swq_depth, 1); \
+	(_tq)->an->an_swq_depth++; \
 } while (0)
 #define ATH_TID_INSERT_TAIL(_tq, _elm, _field) do { \
 	TAILQ_INSERT_TAIL(&(_tq)->tid_q, (_elm), _field); \
 	(_tq)->axq_depth++; \
-	atomic_add_rel_32( &((_tq)->an)->an_swq_depth, 1); \
+	(_tq)->an->an_swq_depth++; \
 } while (0)
 #define ATH_TID_REMOVE(_tq, _elm, _field) do { \
 	TAILQ_REMOVE(&(_tq)->tid_q, _elm, _field); \
 	(_tq)->axq_depth--; \
-	atomic_subtract_rel_32( &((_tq)->an)->an_swq_depth, 1); \
+	(_tq)->an->an_swq_depth--; \
 } while (0)
 #define	ATH_TID_FIRST(_tq)		TAILQ_FIRST(&(_tq)->tid_q)
 #define	ATH_TID_LAST(_tq, _field)	TAILQ_LAST(&(_tq)->tid_q, _field)
@@ -434,17 +438,17 @@ struct ath_txq {
 #define ATH_TID_FILT_INSERT_HEAD(_tq, _elm, _field) do { \
 	TAILQ_INSERT_HEAD(&(_tq)->filtq.tid_q, (_elm), _field); \
 	(_tq)->axq_depth++; \
-	atomic_add_rel_32( &((_tq)->an)->an_swq_depth, 1); \
+	(_tq)->an->an_swq_depth++; \
 } while (0)
 #define ATH_TID_FILT_INSERT_TAIL(_tq, _elm, _field) do { \
 	TAILQ_INSERT_TAIL(&(_tq)->filtq.tid_q, (_elm), _field); \
 	(_tq)->axq_depth++; \
-	atomic_add_rel_32( &((_tq)->an)->an_swq_depth, 1); \
+	(_tq)->an->an_swq_depth++; \
 } while (0)
 #define ATH_TID_FILT_REMOVE(_tq, _elm, _field) do { \
 	TAILQ_REMOVE(&(_tq)->filtq.tid_q, _elm, _field); \
 	(_tq)->axq_depth--; \
-	atomic_subtract_rel_32( &((_tq)->an)->an_swq_depth, 1); \
+	(_tq)->an->an_swq_depth--; \
 } while (0)
 #define	ATH_TID_FILT_FIRST(_tq)		TAILQ_FIRST(&(_tq)->filtq.tid_q)
 #define	ATH_TID_FILT_LAST(_tq, _field)	TAILQ_LAST(&(_tq)->filtq.tid_q,_field)
@@ -463,6 +467,8 @@ struct ath_vap {
 	void		(*av_bmiss)(struct ieee80211vap *);
 	void		(*av_node_ps)(struct ieee80211_node *, int);
 	int		(*av_set_tim)(struct ieee80211_node *, int);
+	void		(*av_recv_pspoll)(struct ieee80211_node *,
+				struct mbuf *);
 };
 #define	ATH_VAP(vap)	((struct ath_vap *)(vap))
 
@@ -792,6 +798,8 @@ struct ath_softc {
 	 *   management/multicast frames;
 	 * + multicast frames overwhelming everything (when the
 	 *   air is sufficiently busy that cabq can't drain.)
+	 * + A node in powersave shouldn't be allowed to exhaust
+	 *   all available mbufs;
 	 *
 	 * These implement:
 	 * + data_minfree is the maximum number of free buffers
@@ -799,8 +807,10 @@ struct ath_softc {
 	 *
 	 * + mcastq_maxdepth is the maximum depth allowed of the cabq.
 	 */
+	int			sc_txq_node_maxdepth;
 	int			sc_txq_data_minfree;
 	int			sc_txq_mcastq_maxdepth;
+	int			sc_txq_node_psq_maxdepth;
 
 	/*
 	 * Aggregation twiddles
@@ -963,6 +973,8 @@ struct ath_softc {
 #define	ATH_TXBUF_UNLOCK(_sc)		mtx_unlock(&(_sc)->sc_txbuflock)
 #define	ATH_TXBUF_LOCK_ASSERT(_sc) \
 	mtx_assert(&(_sc)->sc_txbuflock, MA_OWNED)
+#define	ATH_TXBUF_UNLOCK_ASSERT(_sc) \
+	mtx_assert(&(_sc)->sc_txbuflock, MA_NOTOWNED)
 
 #define	ATH_TXSTATUS_LOCK_INIT(_sc) do { \
 	snprintf((_sc)->sc_txcompname, sizeof((_sc)->sc_txcompname), \

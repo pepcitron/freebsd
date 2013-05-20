@@ -243,6 +243,7 @@ SUBDIR=	\
 	nmdm \
 	${_nsp} \
 	nullfs \
+	${_ntb} \
 	${_nvd} \
 	${_nve} \
 	${_nvme} \
@@ -270,6 +271,7 @@ SUBDIR=	\
 	pty  \
 	puc \
 	${_qlxgb} \
+	${_qlxgbe} \
 	ral \
 	${_ralfw} \
 	${_random} \
@@ -693,6 +695,7 @@ _mthca=		mthca
 .endif
 _ndis=		ndis
 _nfe=		nfe
+_ntb=		ntb
 _nvd=		nvd
 .if ${MK_SOURCELESS_HOST} != "no"
 _nve=		nve
@@ -708,6 +711,7 @@ _padlock=	padlock
 .endif
 _pccard=	pccard
 _qlxgb=		qlxgb
+_qlxgbe=	qlxgbe
 _rdma=		rdma
 _s3=		s3
 _safe=		safe

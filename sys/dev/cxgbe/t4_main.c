@@ -444,6 +444,7 @@ struct {
 	{0x5401,  "Chelsio T520-CR"},
 	{0x5407,  "Chelsio T520-SO"},
 	{0x5408,  "Chelsio T520-CX"},
+	{0x5410,  "Chelsio T580-LP-CR"},	/* 2 x 40G */
 	{0x5411,  "Chelsio T520-LL-CR"},
 #ifdef notyet
 	{0x5402,  "Chelsio T522-CR"},
@@ -458,7 +459,6 @@ struct {
 	{0x540d,  "Chelsio T580-CR"},
 	{0x540e,  "Chelsio T540-LP-CR"},
 	{0x540f,  "Chelsio Amsterdam"},
-	{0x5410,  "Chelsio T580-LP-CR"},
 	{0x5412,  "Chelsio T560-CR"},
 	{0x5413,  "Chelsio T580-CR"},
 #endif
@@ -666,7 +666,7 @@ t4_attach(device_t dev)
 		    device_get_nameunit(dev), i);
 		mtx_init(&pi->pi_lock, pi->lockname, 0, MTX_DEF);
 
-		if (is_10G_port(pi)) {
+		if (is_10G_port(pi) || is_40G_port(pi)) {
 			n10g++;
 			pi->tmr_idx = t4_tmr_idx_10g;
 			pi->pktc_idx = t4_pktc_idx_10g;
@@ -756,7 +756,7 @@ t4_attach(device_t dev)
 
 		pi->first_rxq = rqidx;
 		pi->first_txq = tqidx;
-		if (is_10G_port(pi)) {
+		if (is_10G_port(pi) || is_40G_port(pi)) {
 			pi->nrxq = iaq.nrxq10g;
 			pi->ntxq = iaq.ntxq10g;
 		} else {
@@ -771,7 +771,7 @@ t4_attach(device_t dev)
 		if (is_offload(sc)) {
 			pi->first_ofld_rxq = ofld_rqidx;
 			pi->first_ofld_txq = ofld_tqidx;
-			if (is_10G_port(pi)) {
+			if (is_10G_port(pi) || is_40G_port(pi)) {
 				pi->nofldrxq = iaq.nofldrxq10g;
 				pi->nofldtxq = iaq.nofldtxq10g;
 			} else {
@@ -2037,7 +2037,7 @@ prep_firmware(struct adapter *sc)
 	    should_install_kld_fw(sc, card_fw_usable, be32toh(kld_fw->fw_ver),
 	    be32toh(card_fw->fw_ver))) {
 
-		rc = -t4_load_fw(sc, fw->data, fw->datasize);
+		rc = -t4_fw_upgrade(sc, sc->mbox, fw->data, fw->datasize, 0);
 		if (rc != 0) {
 			device_printf(sc->dev,
 			    "failed to install firmware: %d\n", rc);
@@ -2595,16 +2595,54 @@ build_medialist(struct port_info *pi)
 		case FW_PORT_MOD_TYPE_NA:
 		case FW_PORT_MOD_TYPE_ER:
 		default:
+			device_printf(pi->dev,
+			    "unknown port_type (%d), mod_type (%d)\n",
+			    pi->port_type, pi->mod_type);
 			ifmedia_add(media, m | IFM_UNKNOWN, data, NULL);
 			ifmedia_set(media, m | IFM_UNKNOWN);
 			break;
 		}
 		break;
 
-	case FW_PORT_TYPE_KX4:
-	case FW_PORT_TYPE_KX:
-	case FW_PORT_TYPE_KR:
+	case FW_PORT_TYPE_QSFP:
+		switch (pi->mod_type) {
+
+		case FW_PORT_MOD_TYPE_LR:
+			ifmedia_add(media, m | IFM_40G_LR4, data, NULL);
+			ifmedia_set(media, m | IFM_40G_LR4);
+			break;
+
+		case FW_PORT_MOD_TYPE_SR:
+			ifmedia_add(media, m | IFM_40G_SR4, data, NULL);
+			ifmedia_set(media, m | IFM_40G_SR4);
+			break;
+
+		case FW_PORT_MOD_TYPE_TWINAX_PASSIVE:
+		case FW_PORT_MOD_TYPE_TWINAX_ACTIVE:
+			ifmedia_add(media, m | IFM_40G_CR4, data, NULL);
+			ifmedia_set(media, m | IFM_40G_CR4);
+			break;
+
+		case FW_PORT_MOD_TYPE_NONE:
+			m &= ~IFM_FDX;
+			ifmedia_add(media, m | IFM_NONE, data, NULL);
+			ifmedia_set(media, m | IFM_NONE);
+			break;
+
+		default:
+			device_printf(pi->dev,
+			    "unknown port_type (%d), mod_type (%d)\n",
+			    pi->port_type, pi->mod_type);
+			ifmedia_add(media, m | IFM_UNKNOWN, data, NULL);
+			ifmedia_set(media, m | IFM_UNKNOWN);
+			break;
+		}
+		break;
+
 	default:
+		device_printf(pi->dev,
+		    "unknown port_type (%d), mod_type (%d)\n", pi->port_type,
+		    pi->mod_type);
 		ifmedia_add(media, m | IFM_UNKNOWN, data, NULL);
 		ifmedia_set(media, m | IFM_UNKNOWN);
 		break;
@@ -7094,9 +7132,11 @@ static devclass_t cxgbe_devclass, cxl_devclass;
 
 DRIVER_MODULE(t4nex, pci, t4_driver, t4_devclass, mod_event, 0);
 MODULE_VERSION(t4nex, 1);
+MODULE_DEPEND(t4nex, firmware, 1, 1, 1);
 
 DRIVER_MODULE(t5nex, pci, t5_driver, t5_devclass, mod_event, 0);
 MODULE_VERSION(t5nex, 1);
+MODULE_DEPEND(t5nex, firmware, 1, 1, 1);
 
 DRIVER_MODULE(cxgbe, t4nex, cxgbe_driver, cxgbe_devclass, 0, 0);
 MODULE_VERSION(cxgbe, 1);

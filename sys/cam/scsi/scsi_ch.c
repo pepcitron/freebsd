@@ -125,6 +125,10 @@ typedef enum {
 	CH_Q_NO_DBD	= 0x01
 } ch_quirks;
 
+#define CH_Q_BIT_STRING	\
+	"\020"		\
+	"\001NO_DBD"
+
 #define ccb_state	ppriv_field0
 #define ccb_bp		ppriv_ptr1
 
@@ -706,8 +710,11 @@ chdone(struct cam_periph *periph, union ccb *done_ccb)
 				announce_buf[0] = '\0';
 			}
 		}
-		if (announce_buf[0] != '\0')
+		if (announce_buf[0] != '\0') {
 			xpt_announce_periph(periph, announce_buf);
+			xpt_announce_quirks(periph, softc->quirks,
+			    CH_Q_BIT_STRING);
+		}
 		softc->state = CH_STATE_NORMAL;
 		free(mode_header, M_SCSICH);
 		/*
@@ -1147,15 +1154,11 @@ copy_element_status(struct ch_softc *softc,
 			ces->ces_designator_length = devid->designator_length;
 			/*
 			 * Make sure we are always NUL terminated.  The
-			 * buffer should be sized for the maximum
-			 * designator length plus 1, but this will make sure
-			 * there is always a NUL at the end.  This won't
-			 * matter for the binary code set, since the user
-			 * will only pay attention to the length field.
+			 * This won't matter for the binary code set,
+			 * since the user will only pay attention to the
+			 * length field.
 			 */
-			ces->ces_designator[
-			    MIN(sizeof(ces->ces_designator) - 1,
-			    devid->designator_length)]= '\0';
+			ces->ces_designator[devid->designator_length]= '\0';
 		}
 		if (devid->piv_assoc_designator_type &
 		    READ_ELEMENT_STATUS_PIV_SET) {
