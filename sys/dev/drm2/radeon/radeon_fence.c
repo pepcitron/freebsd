@@ -338,11 +338,13 @@ static int radeon_fence_wait_seq(struct radeon_device *rdev, u64 target_seq,
 #endif /* DUMBBELL_WIP */
 
 		if (unlikely(!signaled)) {
+#ifndef __FreeBSD__
 			/* we were interrupted for some reason and fence
 			 * isn't signaled yet, resume waiting */
 			if (r) {
 				continue;
 			}
+#endif
 
 			/* check if sequence value has changed since last_activity */
 			if (seq != atomic_load_acq_long(&rdev->fence_drv[ring].last_seq)) {
@@ -529,11 +531,13 @@ static int radeon_fence_wait_any_seq(struct radeon_device *rdev,
 #endif /* DUMBBELL_WIP */
 
 		if (unlikely(!signaled)) {
+#ifndef __FreeBSD__
 			/* we were interrupted for some reason and fence
 			 * isn't signaled yet, resume waiting */
 			if (r) {
 				continue;
 			}
+#endif
 
 			sx_xlock(&rdev->ring_lock);
 			for (i = 0, tmp = 0; i < RADEON_NUM_RINGS; ++i) {
