@@ -355,7 +355,7 @@ int radeon_sa_bo_new(struct radeon_device *rdev,
 			/* see if we can skip over some allocations */
 		} while (radeon_sa_bo_next_hole(sa_manager, fences, tries));
 
-		sx_xlock(&sa_manager->wq_lock);
+		sx_xunlock(&sa_manager->wq_lock);
 		r = radeon_fence_wait_any(rdev, fences, false);
 		sx_xlock(&sa_manager->wq_lock);
 		/* if we have nothing to wait for block */
