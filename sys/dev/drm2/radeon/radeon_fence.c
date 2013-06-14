@@ -323,8 +323,14 @@ static int radeon_fence_wait_seq(struct radeon_device *rdev, u64 target_seq,
 				    &rdev->fence_queue_mtx,
 				    timeout);
 			}
-			if (r != 0)
+			if (r != 0) {
+				if (r == EWOULDBLOCK) {
+					signaled =
+					    radeon_fence_seq_signaled(
+						rdev, target_seq, ring);
+				}
 				break;
+			}
 		}
 		if (fence_queue_locked) {
 			mtx_unlock(&rdev->fence_queue_mtx);
@@ -512,8 +518,14 @@ static int radeon_fence_wait_any_seq(struct radeon_device *rdev,
 				    &rdev->fence_queue_mtx,
 				    timeout);
 			}
-			if (r != 0)
+			if (r != 0) {
+				if (r == EWOULDBLOCK) {
+					signaled =
+					    radeon_fence_any_seq_signaled(
+						rdev, target_seq);
+				}
 				break;
+			}
 		}
 		if (fence_queue_locked) {
 			mtx_unlock(&rdev->fence_queue_mtx);
