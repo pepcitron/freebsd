@@ -1632,6 +1632,8 @@ pmap_enter_object(pmap_t pm, vm_offset_t start, vm_offset_t end,
 	vm_page_t m;
 	vm_pindex_t diff, psize;
 
+	VM_OBJECT_ASSERT_LOCKED(m_start->object);
+
 	psize = atop(end - start);
 	m = m_start;
 	rw_wlock(&tte_list_global_lock);
@@ -2244,7 +2246,7 @@ pmap_activate(struct thread *td)
 	pm->pm_context[curcpu] = context;
 #ifdef SMP
 	CPU_SET_ATOMIC(PCPU_GET(cpuid), &pm->pm_active);
-	atomic_store_ptr((uintptr_t *)PCPU_PTR(pmap), (uintptr_t)pm);
+	atomic_store_rel_ptr((uintptr_t *)PCPU_PTR(pmap), (uintptr_t)pm);
 #else
 	CPU_SET(PCPU_GET(cpuid), &pm->pm_active);
 	PCPU_SET(pmap, pm);

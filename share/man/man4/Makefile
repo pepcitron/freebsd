@@ -4,6 +4,7 @@
 .include <bsd.own.mk>
 
 MAN=	aac.4 \
+	aacraid.4 \
 	acpi.4 \
 	${_acpi_asus.4} \
 	${_acpi_asus_wmi.4} \
@@ -515,6 +516,7 @@ MAN=	aac.4 \
 	ural.4 \
 	urio.4 \
 	${_urtw.4} \
+	urtwn.4 \
 	usb.4 \
 	usb_quirk.4 \
 	uslcom.4 \
