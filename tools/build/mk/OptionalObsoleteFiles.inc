@@ -388,6 +388,9 @@ OLD_FILES+=var/named/etc/namedb/PROTO.localhost.rev
 OLD_FILES+=var/named/etc/namedb/make-localhost
 #OLD_FILES+=var/named/etc/namedb/named.conf	# intentionally left out
 OLD_FILES+=var/named/etc/namedb/named.root
+OLD_FILES+=var/named/etc/namedb/master/empty.db
+OLD_FILES+=var/named/etc/namedb/master/localhost-forward.db
+OLD_FILES+=var/named/etc/namedb/master/localhost-reverse.db
 OLD_DIRS+=var/named/etc/namedb/slave
 OLD_DIRS+=var/named/etc/namedb/master
 OLD_DIRS+=var/named/etc/namedb/dynamic
@@ -1553,6 +1556,7 @@ OLD_FILES+=usr/include/gcc/4.2/mmintrin.h
 OLD_FILES+=usr/include/gcc/4.2/pmmintrin.h
 OLD_FILES+=usr/include/gcc/4.2/tmmintrin.h
 OLD_FILES+=usr/include/gcc/4.2/xmmintrin.h
+OLD_FILES+=usr/include/gcc/4.2/mm3dnow.h
 .elif ${TARGET_ARCH} == "ia64"
 OLD_FILES+=usr/include/gcc/4.2/ia64intrin.h
 .elif ${TARGET_ARCH} == "arm"
@@ -4316,4 +4320,28 @@ OLD_FILES+=usr/share/man/man8/wlandebug.8.gz
 OLD_FILES+=usr/share/man/man8/wpa_cli.8.gz
 OLD_FILES+=usr/share/man/man8/wpa_passphrase.8.gz
 OLD_FILES+=usr/share/man/man8/wpa_supplicant.8.gz
+.endif
+
+.if ${MK_SVNLITE} == no || ${MK_SVN} == yes
+OLD_FILES+=usr/bin/svnlite
+OLD_FILES+=usr/bin/svnliteadmin
+OLD_FILES+=usr/bin/svnlitedumpfilter
+OLD_FILES+=usr/bin/svnlitelook
+OLD_FILES+=usr/bin/svnlitemucc
+OLD_FILES+=usr/bin/svnliterdump
+OLD_FILES+=usr/bin/svnliteserve
+OLD_FILES+=usr/bin/svnlitesync
+OLD_FILES+=usr/bin/svnliteversion
+.endif
+
+.if ${MK_SVN} == no
+OLD_FILES+=usr/bin/svn
+OLD_FILES+=usr/bin/svnadmin
+OLD_FILES+=usr/bin/svndumpfilter
+OLD_FILES+=usr/bin/svnlook
+OLD_FILES+=usr/bin/svnmucc
+OLD_FILES+=usr/bin/svnrdump
+OLD_FILES+=usr/bin/svnserve
+OLD_FILES+=usr/bin/svnsync
+OLD_FILES+=usr/bin/svnversion
 .endif
