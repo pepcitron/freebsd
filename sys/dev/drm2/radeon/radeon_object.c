@@ -129,9 +129,6 @@ int radeon_bo_create(struct radeon_device *rdev,
 
 	size = roundup2(size, PAGE_SIZE);
 
-#ifdef DUMBBELL_WIP
-	rdev->mman.bdev.dev_mapping = rdev->ddev->dev_mapping;
-#endif /* DUMBBELL_WIP */
 	if (kernel) {
 		type = ttm_bo_type_kernel;
 	} else if (sg) {
