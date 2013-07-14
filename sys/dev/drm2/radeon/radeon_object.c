@@ -322,7 +322,6 @@ void radeon_bo_force_delete(struct radeon_device *rdev)
 	}
 	dev_err(rdev->dev, "Userspace still has active objects !\n");
 	list_for_each_entry_safe(bo, n, &rdev->gem.objects, list) {
-		DRM_LOCK(rdev->ddev);
 		dev_err(rdev->dev, "%p %p %lu %lu force free\n",
 			&bo->gem_base, bo, (unsigned long)bo->gem_base.size,
 			*((unsigned long *)&bo->gem_base.refcount));
@@ -331,7 +330,6 @@ void radeon_bo_force_delete(struct radeon_device *rdev)
 		sx_xunlock(&bo->rdev->gem.mutex);
 		/* this should unref the ttm bo */
 		drm_gem_object_unreference(&bo->gem_base);
-		DRM_UNLOCK(rdev->ddev);
 	}
 }
 
