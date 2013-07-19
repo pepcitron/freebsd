@@ -1432,6 +1432,8 @@ void drm_gem_pager_dtr(void *obj);
 struct ttm_bo_device;
 int ttm_bo_mmap_single(struct ttm_bo_device *bdev, vm_ooffset_t *offset,
     vm_size_t size, struct vm_object **obj_res, int nprot);
+struct ttm_buffer_object;
+void ttm_bo_release_mmap(struct ttm_buffer_object *bo);
 
 void drm_device_lock_mtx(struct drm_device *dev);
 void drm_device_unlock_mtx(struct drm_device *dev);
