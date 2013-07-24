@@ -665,6 +665,10 @@ scsi_op_desc(u_int16_t opcode, struct scsi_inquiry_data *inq_data)
 	if (pd_type == T_RBC)
 		pd_type = T_DIRECT;
 
+	/* Map NODEVICE to Direct Access Device to handle REPORT LUNS, etc. */
+	if (pd_type == T_NODEVICE)
+		pd_type = T_DIRECT;
+
 	opmask = 1 << pd_type;
 
 	for (j = 0; j < num_tables; j++) {
@@ -796,9 +800,9 @@ static struct asc_table_entry seagate_entries[] = {
 	{ SST(0x0B, 0x8C, SS_RDEF,
 	    "12V Voltage Warning") },
 	{ SST(0x0C, 0xFF, SS_RDEF,
-	    "Write Error – Too many error recovery revs") },
+	    "Write Error - Too many error recovery revs") },
 	{ SST(0x11, 0xFF, SS_RDEF,
-	    "Unrecovered Read Error – Too many error recovery revs") },
+	    "Unrecovered Read Error - Too many error recovery revs") },
 	{ SST(0x19, 0x0E, SS_RDEF,
 	    "Fewer than 1/2 defect list copies") },
 	{ SST(0x20, 0xF3, SS_RDEF,
@@ -812,15 +816,15 @@ static struct asc_table_entry seagate_entries[] = {
 	{ SST(0x24, 0xF3, SS_RDEF,
 	    "Drive formatted without plist") },
 	{ SST(0x26, 0x95, SS_RDEF,
-	    "Invalid Field Parameter – CAP File") },
+	    "Invalid Field Parameter - CAP File") },
 	{ SST(0x26, 0x96, SS_RDEF,
-	    "Invalid Field Parameter – RAP File") },
+	    "Invalid Field Parameter - RAP File") },
 	{ SST(0x26, 0x97, SS_RDEF,
-	    "Invalid Field Parameter – TMS Firmware Tag") },
+	    "Invalid Field Parameter - TMS Firmware Tag") },
 	{ SST(0x26, 0x98, SS_RDEF,
-	    "Invalid Field Parameter – Check Sum") },
+	    "Invalid Field Parameter - Check Sum") },
 	{ SST(0x26, 0x99, SS_RDEF,
-	    "Invalid Field Parameter – Firmware Tag") },
+	    "Invalid Field Parameter - Firmware Tag") },
 	{ SST(0x29, 0x08, SS_RDEF,
 	    "Write Log Dump data") },
 	{ SST(0x29, 0x09, SS_RDEF,
@@ -834,7 +838,7 @@ static struct asc_table_entry seagate_entries[] = {
 	{ SST(0x31, 0x91, SS_RDEF,
 	    "Format Corrupted World Wide Name (WWN) is Invalid") },
 	{ SST(0x32, 0x03, SS_RDEF,
-	    "Defect List – Length exceeds Command Allocated Length") },
+	    "Defect List - Length exceeds Command Allocated Length") },
 	{ SST(0x33, 0x00, SS_RDEF,
 	    "Flash not ready for access") },
 	{ SST(0x3F, 0x70, SS_RDEF,
@@ -1645,7 +1649,7 @@ static struct asc_table_entry asc_table[] = {
 	{ SST(0x24, 0x08, SS_RDEF,	/* XXX TBD */
 	    "Invalid XCDB") },
 	/* DTLPWROMAEBKVF */
-	{ SST(0x25, 0x00, SS_FATAL | ENXIO,
+	{ SST(0x25, 0x00, SS_FATAL | ENXIO | SSQ_LOST,
 	    "Logical unit not supported") },
 	/* DTLPWROMAEBKVF */
 	{ SST(0x26, 0x00, SS_FATAL | EINVAL,
@@ -2163,7 +2167,7 @@ static struct asc_table_entry asc_table[] = {
 	{ SST(0x3F, 0x0D, SS_RDEF,
 	    "Volume set reassigned") },
 	/* DTLPWROMAE     */
-	{ SST(0x3F, 0x0E, SS_RDEF,	/* XXX TBD */
+	{ SST(0x3F, 0x0E, SS_RDEF | SSQ_RESCAN ,
 	    "Reported LUNs data has changed") },
 	/* DTLPWROMAEBKVF */
 	{ SST(0x3F, 0x0F, SS_RDEF,	/* XXX TBD */
@@ -3263,6 +3267,7 @@ scsi_error_action(struct ccb_scsiio *csio, struct scsi_inquiry_data *inq_data,
 				action |= SS_RETRY|SSQ_DECREMENT_COUNT|
 					  SSQ_PRINT_SENSE;
 			}
+			action |= SSQ_UA;
 		}
 	}
 	if ((action & SS_MASK) >= SS_START &&
