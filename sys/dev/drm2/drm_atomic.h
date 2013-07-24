@@ -47,12 +47,14 @@ typedef u_int64_t atomic64_t;
 static __inline atomic_t
 test_and_set_bit(int b, volatile void *p)
 {
-	int s = splhigh();
-	unsigned int m = 1<<b;
-	unsigned int r = *(volatile int *)p & m;
-	*(volatile int *)p |= m;
-	splx(s);
-	return r;
+	long bit, val;
+
+	bit = 1 << b;
+	do {
+		val = *(volatile long *)p;
+	} while (atomic_cmpset_long(p, val, val | bit) == 0);
+
+	return ((val & bit) != 0);
 }
 
 static __inline void
@@ -96,19 +98,21 @@ atomic_xchg(volatile int *p, int new)
 {
 	int old;
 
-	old = *p;
-	*p = new;
+	do {
+		old = *p;
+	} while(!atomic_cmpset_int(p, old, new));
 
 	return (old);
 }
 
-static __inline long
-atomic64_xchg(volatile long *p, long new)
+static __inline uint64_t
+atomic64_xchg(volatile uint64_t *p, uint64_t new)
 {
-	long old;
+	uint64_t old;
 
-	old = *p;
-	*p = new;
+	do {
+		old = *p;
+	} while(!atomic_cmpset_64(p, old, new));
 
 	return (old);
 }
@@ -117,16 +121,14 @@ static __inline int
 atomic_add_return(int i, atomic_t *p)
 {
 
-	atomic_add(i, p);
-	return *p;
+	return i + atomic_fetchadd_int(p, i);
 }
 
 static __inline int
 atomic_sub_return(int i, atomic_t *p)
 {
 
-	atomic_sub(i, p);
-	return *p;
+	return atomic_fetchadd_int(p, -i) - i;
 }
 
 #define	atomic_inc_return(v)		atomic_add_return(1, (v))
