@@ -1,0 +1,15 @@
+#!/bin/sh
+
+set -e
+
+scriptdir=$(cd $(dirname $0) && pwd)
+fwdir=$1
+
+if [ -z "$fwdir" -o ! -d "$fwdir" ]; then 
+	echo "Syntax: $(basename $0) <path to original firmwares>" 1>&2 
+	exit 
+fi
+
+for file in "$fwdir"/*.bin; do
+	uuencode -o "$scriptdir"/$(basename $file).uu $file $(basename $file)
+done 
