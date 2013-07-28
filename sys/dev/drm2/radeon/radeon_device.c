@@ -1012,6 +1012,7 @@ int radeon_device_init(struct radeon_device *rdev,
 	rdev->usec_timeout = RADEON_MAX_USEC_TIMEOUT;
 	rdev->mc.gtt_size = radeon_gart_size * 1024 * 1024;
 	rdev->accel_working = false;
+	rdev->fictitious_range_registered = false;
 	/* set up ring ids */
 	for (i = 0; i < RADEON_NUM_RINGS; i++) {
 		rdev->ring[i].idx = i;
@@ -1160,8 +1161,12 @@ int radeon_device_init(struct radeon_device *rdev,
 	    rdev->mc.aper_base + rdev->mc.visible_vram_size,
 	    VM_MEMATTR_WRITE_COMBINING);
 	if (r != 0) {
+		DRM_ERROR("Failed to register fictitious range "
+		    "0x%lx-0x%lx (%d).\n", rdev->mc.aper_base,
+		    rdev->mc.aper_base + rdev->mc.visible_vram_size, r);
 		return (-r);
 	}
+	rdev->fictitious_range_registered = true;
 
 	if ((radeon_testing & 1)) {
 		radeon_test_moves(rdev);
@@ -1194,9 +1199,11 @@ void radeon_device_fini(struct radeon_device *rdev)
 	/* evict vram memory */
 	radeon_bo_evict_vram(rdev);
 
-	vm_phys_fictitious_unreg_range(
-	    rdev->mc.aper_base,
-	    rdev->mc.aper_base + rdev->mc.visible_vram_size);
+	if (rdev->fictitious_range_registered) {
+		vm_phys_fictitious_unreg_range(
+		    rdev->mc.aper_base,
+		    rdev->mc.aper_base + rdev->mc.visible_vram_size);
+	}
 
 	radeon_fini(rdev);
 #ifdef DUMBBELL_WIP
