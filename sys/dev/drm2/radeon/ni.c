@@ -393,6 +393,41 @@ out:
 	return err;
 }
 
+/**
+ * ni_fini_microcode - drop the firmwares image references
+ *
+ * @rdev: radeon_device pointer
+ *
+ * Drop the pfp, me, mc and rlc firmwares image references.
+ * Called at driver shutdown.
+ */
+static void ni_fini_microcode(struct radeon_device *rdev)
+{
+
+	DRM_INFO("radeon: unload firmwares.\n");
+
+	if (rdev->pfp_fw != NULL) {
+		firmware_put(rdev->pfp_fw, FIRMWARE_UNLOAD);
+		rdev->pfp_fw = NULL;
+	}
+
+	if (rdev->me_fw != NULL) {
+		firmware_put(rdev->me_fw, FIRMWARE_UNLOAD);
+		rdev->me_fw = NULL;
+	}
+
+	if (rdev->rlc_fw != NULL) {
+		firmware_put(rdev->rlc_fw, FIRMWARE_UNLOAD);
+		rdev->rlc_fw = NULL;
+	}
+
+	if (rdev->mc_fw != NULL) {
+		firmware_put(rdev->mc_fw, FIRMWARE_UNLOAD);
+		rdev->mc_fw = NULL;
+	}
+}
+
+
 /*
  * Core functions
  */
@@ -1764,6 +1799,7 @@ void cayman_fini(struct radeon_device *rdev)
 	radeon_fence_driver_fini(rdev);
 	radeon_bo_fini(rdev);
 	radeon_atombios_fini(rdev);
+	ni_fini_microcode(rdev);
 	free(rdev->bios, DRM_MEM_DRIVER);
 	rdev->bios = NULL;
 }

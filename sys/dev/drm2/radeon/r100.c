@@ -1013,6 +1013,25 @@ static int r100_cp_init_microcode(struct radeon_device *rdev)
 	return err;
 }
 
+/**
+ * r100_cp_fini_microcode - drop the firmware image reference
+ *
+ * @rdev: radeon_device pointer
+ *
+ * Drop the me firmware image reference.
+ * Called at driver shutdown.
+ */
+static void r100_cp_fini_microcode (struct radeon_device *rdev)
+{
+
+	DRM_INFO("radeon: unload firmware.\n");
+
+	if (rdev->me_fw != NULL) {
+		firmware_put(rdev->me_fw, FIRMWARE_UNLOAD);
+		rdev->me_fw = NULL;
+	}
+}
+
 static void r100_cp_load_microcode(struct radeon_device *rdev)
 {
 	const __be32 *fw_data;
@@ -4013,6 +4032,7 @@ void r100_fini(struct radeon_device *rdev)
 	radeon_fence_driver_fini(rdev);
 	radeon_bo_fini(rdev);
 	radeon_atombios_fini(rdev);
+	r100_cp_fini_microcode(rdev);
 	free(rdev->bios, DRM_MEM_DRIVER);
 	rdev->bios = NULL;
 }
